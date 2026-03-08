@@ -9,7 +9,7 @@ const fs = require('fs');
 
 // ─── Transcribe audio with OpenAI Whisper ─────────────────
 
-async function transcribeAudio(audioFilePath) 
+async function transcribeAudio(audioFilePath)  {
   console.log(`[AI] Transcribing ${audioFilePath}...`);
 
   const form = new FormData();
