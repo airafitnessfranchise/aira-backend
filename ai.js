@@ -9,7 +9,7 @@ const fs = require('fs');
 
 // ─── Transcribe audio with OpenAI Whisper ─────────────────
 
-async function transcribeAudio(audioFilePath) {
+async function transcribeAudio(audioFilePath) 
   console.log(`[AI] Transcribing ${audioFilePath}...`);
 
   const form = new FormData();
@@ -94,7 +94,7 @@ ${transcript}`;
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
-      model: 'claude-opus-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }]
     },
