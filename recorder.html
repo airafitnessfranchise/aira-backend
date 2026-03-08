@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Aira Recorder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0a; --surface: #111; --border: #1e1e1e;
+    --accent: #c8f060; --red: #ff4444; --text: #f0f0f0; --muted: #555;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; gap: 24px; }
+  .brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); }
+  .ring-wrap { position: relative; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+  .ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: var(--border); stroke-width: 3; }
+  .ring-progress { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 628; stroke-dashoffset: 628; transition: stroke-dashoffset 0.1s linear; }
+  .ring-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+  .status-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: all 0.3s; }
+  .status-dot.ready { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .status-dot.recording { background: var(--red); box-shadow: 0 0 16px var(--red); animation: pulse 1s ease-in-out infinite; }
+  .status-dot.uploading { background: #60a0f0; box-shadow: 0 0 12px #60a0f0; animation: pulse 0.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(0.85)} }
+  .timer { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 42px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .timer.recording { color: var(--accent); }
+  .status-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  .status-label.active { color: var(--accent); }
+  .status-label.rec { color: var(--red); }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 480px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .card-value { font-size: 13px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .btn-row { display: flex; gap: 12px; width: 100%; max-width: 480px; }
+  .btn { flex: 1; height: 56px; border-radius: 14px; border: none; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+  .btn:active { transform: scale(0.97); }
+  .btn-start { background: var(--accent); color: #0a0a0a; }
+  .btn-start:disabled { background: var(--border); color: var(--muted); cursor: default; }
+  .btn-stop { background: transparent; color: var(--red); border: 1px solid var(--red); }
+  .btn-stop:disabled { color: var(--muted); border-color: var(--border); cursor: default; }
+  .conn-bar { width: 100%; max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .conn-dot.connected { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .conn-dot.disconnected { background: var(--red); }
+  .log { width: 100%; max-width: 480px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 80px; overflow-y: auto; }
+  .log-entry { font-size: 10px; color: var(--muted); display: flex; gap: 8px; }
+  .log-entry .ts { color: #4a6a20; flex-shrink: 0; }
+  .log-entry.important { color: var(--text); }
+  .log-entry.error { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="brand">Aira Fitness · Consult Recorder</div>
+
+<div class="ring-wrap">
+  <svg class="ring-svg" viewBox="0 0 220 220">
+    <circle class="ring-track" cx="110" cy="110" r="100"/>
+    <circle class="ring-progress" id="ring" cx="110" cy="110" r="100"/>
+  </svg>
+  <div class="ring-inner">
+    <div class="status-dot" id="status-dot"></div>
+    <div class="timer" id="timer">00:00</div>
+    <div class="status-label" id="status-label">Starting...</div>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card"><div class="card-label">Appt ID</div><div class="card-value" id="appt-id">—</div></div>
+  <div class="card"><div class="card-label">Location</div><div class="card-value" id="location-val">—</div></div>
+  <div class="card"><div class="card-label">Mic</div><div class="card-value" id="mic-status">Checking...</div></div>
+  <div class="card"><div class="card-label">File Size</div><div class="card-value" id="file-size">—</div></div>
+</div>
+
+<div class="btn-row">
+  <button class="btn btn-start" id="btn-start" onclick="manualStart()" disabled>▶ Walk-In</button>
+  <button class="btn btn-stop" id="btn-stop" onclick="stopRecording()" disabled>■ Stop</button>
+</div>
+
+<div class="conn-bar">
+  <div class="conn-dot disconnected" id="conn-dot"></div>
+  <span id="conn-label">Connecting to server...</span>
+</div>
+
+<div class="log" id="log"></div>
+
+<script>
+  // ─── CONFIG ───────────────────────────────────────────────
+  // This gets set automatically from the URL query params
+  // e.g. https://recorder.airafitness.com?location=chicago-01&server=wss://your-server.railway.app
+  const params = new URLSearchParams(window.location.search);
+  const LOCATION_ID = params.get('location') || 'unknown-location';
+  const SERVER_URL = params.get('server') || `wss://${window.location.host}`;
+
+  document.getElementById('location-val').textContent = LOCATION_ID;
+
+  // ─── STATE ────────────────────────────────────────────────
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let timerInterval = null;
+  let seconds = 0;
+  let ws = null;
+  let micGranted = false;
+  let currentApptId = null;
+  let silenceTimer = null;
+  let wsReconnectTimer = null;
+  const SILENCE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+
+  // ─── LOG ──────────────────────────────────────────────────
+  function log(msg, type = '') {
+    const el = document.getElementById('log');
+    const ts = new Date().toTimeString().slice(0,8);
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.innerHTML = `<span class="ts">${ts}</span><span>${msg}</span>`;
+    el.appendChild(entry);
+    el.scrollTop = el.scrollHeight;
+    if (el.children.length > 50) el.removeChild(el.children[0]);
+  }
+
+  // ─── STATUS ───────────────────────────────────────────────
+  function setStatus(state, label) {
+    document.getElementById('status-dot').className = 'status-dot ' + state;
+    const lbl = document.getElementById('status-label');
+    lbl.textContent = label;
+    lbl.className = 'status-label' + (state === 'recording' ? ' rec' : state === 'ready' ? ' active' : '');
+    document.getElementById('timer').className = 'timer' + (state === 'recording' ? ' recording' : '');
+  }
+
+  // ─── MIC ──────────────────────────────────────────────────
+  async function requestMic() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      micGranted = true;
+      document.getElementById('mic-status').textContent = 'Ready ✓';
+      document.getElementById('btn-start').disabled = false;
+      setStatus('ready', 'Ready');
+      log('Mic ready', 'important');
+    } catch(e) {
+      document.getElementById('mic-status').textContent = 'Denied ✗';
+      setStatus('', 'Mic Denied');
+      log('Mic denied: ' + e.message, 'error');
+    }
+  }
+
+  // ─── RECORDING ────────────────────────────────────────────
+  async function startRecording(apptId) {
+    if (!micGranted) { await requestMic(); if (!micGranted) return; }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') return;
+
+    currentApptId = apptId;
+    document.getElementById('appt-id').textContent = apptId;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4']
+        .find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+        updateFileSize();
+        resetSilenceTimer();
+      };
+      mediaRecorder.onstop = () => uploadRecording(apptId, mimeType, stream);
+      mediaRecorder.start(2000); // chunk every 2s
+
+      startTimer();
+      setStatus('recording', 'Recording');
+      document.getElementById('btn-start').disabled = true;
+      document.getElementById('btn-stop').disabled = false;
+      resetSilenceTimer();
+      log(`Recording started — ${apptId}`, 'important');
+    } catch(e) {
+      log('Start failed: ' + e.message, 'error');
+    }
+  }
+
+  function stopRecording() {
+    clearTimeout(silenceTimer);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      stopTimer();
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-stop').disabled = true;
+      setStatus('uploading', 'Uploading...');
+      log('Recording stopped — uploading...');
+    }
+  }
+
+  function manualStart() {
+    startRecording('WALKIN-' + Date.now());
+  }
+
+  function resetSilenceTimer() {
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => {
+      log('Silence detected — auto-stopping', 'important');
+      stopRecording();
+    }, SILENCE_THRESHOLD_MS);
+  }
+
+  // ─── UPLOAD ───────────────────────────────────────────────
+  async function uploadRecording(apptId, mimeType, stream) {
+    stream.getTracks().forEach(t => t.stop());
+
+    const blob = new Blob(audioChunks, { type: mimeType });
+    const ext = mimeType.includes('mp4') ? 'm4a' : 'webm';
+
+    log(`Uploading ${formatBytes(blob.size)}...`);
+
+    const form = new FormData();
+    form.append('appointment_id', apptId);
+    form.append('location_id', LOCATION_ID);
+    form.append('duration_seconds', String(seconds));
+    form.append('audio_file', blob, `recording-${apptId}.${ext}`);
+
+    try {
+      const res = await fetch(`${window.location.origin}/upload/recording`, {
+        method: 'POST',
+        body: form
+      });
+      const data = await res.json();
+      if (data.success) {
+        log(`Upload complete — ${data.recording_id}`, 'important');
+        setStatus('ready', 'Ready');
+        document.getElementById('file-size').textContent = formatBytes(blob.size);
+        document.getElementById('appt-id').textContent = '—';
+        seconds = 0;
+        updateTimerDisplay();
+        document.getElementById('ring').style.strokeDashoffset = 628;
+      } else {
+        log('Upload failed: ' + JSON.stringify(data), 'error');
+        setStatus('ready', 'Upload Failed');
+      }
+    } catch(e) {
+      log('Upload error: ' + e.message, 'error');
+      setStatus('ready', 'Upload Failed');
+    }
+  }
+
+  // ─── TIMER ────────────────────────────────────────────────
+  function startTimer() {
+    seconds = 0;
+    updateTimerDisplay();
+    timerInterval = setInterval(() => { seconds++; updateTimerDisplay(); updateRing(); }, 1000);
+  }
+  function stopTimer() { clearInterval(timerInterval); }
+  function updateTimerDisplay() {
+    const m = String(Math.floor(seconds/60)).padStart(2,'0');
+    const s = String(seconds%60).padStart(2,'0');
+    document.getElementById('timer').textContent = `${m}:${s}`;
+  }
+  function updateRing() {
+    const progress = Math.min(seconds/1800, 1);
+    document.getElementById('ring').style.strokeDashoffset = 628 - (628 * progress);
+  }
+  function updateFileSize() {
+    const bytes = audioChunks.reduce((a,c) => a+c.size, 0);
+    document.getElementById('file-size').textContent = bytes > 0 ? formatBytes(bytes) : '—';
+  }
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+  }
+
+  // ─── WEBSOCKET ────────────────────────────────────────────
+  function connectWS() {
+    clearTimeout(wsReconnectTimer);
+    log(`Connecting to ${SERVER_URL}...`);
+
+    try {
+      ws = new WebSocket(SERVER_URL);
+
+      ws.onopen = () => {
+        document.getElementById('conn-dot').className = 'conn-dot connected';
+        document.getElementById('conn-label').textContent = `Connected · ${LOCATION_ID}`;
+        log('Connected to server', 'important');
+
+        // Register this tablet
+        ws.send(JSON.stringify({ type: 'register', location_id: LOCATION_ID }));
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          log(`Server: ${msg.type || msg.action} ${msg.message || ''}`);
+
+          if (msg.action === 'start') {
+            log(`Trigger received — starting for ${msg.appt_id}`, 'important');
+            startRecording(msg.appt_id);
+          }
+          if (msg.action === 'stop') {
+            log('Stop signal received', 'important');
+            stopRecording();
+          }
+        } catch(e) {}
+      };
+
+      ws.onclose = () => {
+        document.getElementById('conn-dot').className = 'conn-dot disconnected';
+        document.getElementById('conn-label').textContent = 'Disconnected — reconnecting...';
+        log('Disconnected — retrying in 5s', 'error');
+        wsReconnectTimer = setTimeout(connectWS, 5000);
+      };
+
+      ws.onerror = () => {
+        log('WebSocket error', 'error');
+      };
+
+    } catch(e) {
+      log('Connection failed: ' + e.message, 'error');
+      wsReconnectTimer = setTimeout(connectWS, 5000);
+    }
+  }
+
+  // ─── INIT ─────────────────────────────────────────────────
+  window.onload = async () => {
+    log('App loaded');
+
+    // Keep screen awake
+    if ('wakeLock' in navigator) {
+      try {
+        await navigator.wakeLock.request('screen');
+        log('Screen wake lock active');
+      } catch(e) {}
+    }
+
+    await requestMic();
+    connectWS();
+  };
+</script>
+</body>
+</html>
