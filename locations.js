@@ -1,35 +1,24 @@
 // locations.js
 // ─────────────────────────────────────────────────────────
-// This is your location registry.
-// Add one entry per Aira location.
-// ghl_calendar_id = the calendar ID from GHL for that location
+// Location registry for Aira Fitness Consult Recorder
+// Add one entry per location/tablet
 // ─────────────────────────────────────────────────────────
-
 const locations = [
   {
-    location_id: "chicago-01",
-    franchise_name: "Aira Fitness Chicago",
-    franchisee_name: "John Smith",
-    franchisee_email: "john@airachicago.com",
-    ghl_calendar_id: "PASTE_GHL_CALENDAR_ID_HERE"
+        location_id: "fox-lake-01",
+        franchise_name: "Aira Fitness Fox Lake",
+        franchisee_name: "Fox Lake Gym Test employee",
+        franchisee_email: "mikebell@airafitness.com",
+        ghl_calendar_id: "e5CB1cSvhcY6dlWEUUjI"
   },
-  // Add more locations here as you roll out:
-  // {
-  //   location_id: "miami-01",
-  //   franchise_name: "Aira Fitness Miami",
-  //   franchisee_name: "Jane Doe",
-  //   franchisee_email: "jane@airaMiami.com",
-  //   ghl_calendar_id: "PASTE_GHL_CALENDAR_ID_HERE"
-  // },
-];
+  ];
 
-// Build a lookup map: ghl_calendar_id → location
+// Build lookup maps
 const byCalendarId = {};
 const byLocationId = {};
-
 locations.forEach(loc => {
-  byCalendarId[loc.ghl_calendar_id] = loc;
-  byLocationId[loc.location_id] = loc;
+    byCalendarId[loc.ghl_calendar_id] = loc;
+    byLocationId[loc.location_id] = loc;
 });
 
 module.exports = { locations, byCalendarId, byLocationId };
