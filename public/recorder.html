@@ -107,8 +107,10 @@
   let micGranted = false;
   let currentApptId = null;
   let silenceTimer = null;
+  let maxRecordingTimer = null;
   let wsReconnectTimer = null;
   const SILENCE_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
+  const MAX_RECORDING_MS = 30 * 60 * 1000;     // 30-minute hard stop
 
   // ─── LOG ──────────────────────────────────────────────────
   function log(msg, type = '') {
@@ -185,6 +187,8 @@
 
   function stopRecording() {
     clearTimeout(silenceTimer);
+    clearTimeout(maxRecordingTimer);
+    maxRecordingTimer = null;
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
       stopTimer();
