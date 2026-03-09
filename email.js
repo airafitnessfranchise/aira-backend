@@ -18,11 +18,11 @@ function coachingBlockText(label, raw) {
 function coachingBlockHtml(label, raw) {
   const c = parseCoaching(raw);
   return `<div style="margin:20px 0;padding:18px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
-    <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
-    <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">❌ What happened</span><br><span style="color:#374151;font-size:13px;">${c.what_happened||'N/A'}</span></div>
-    <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br><span style="color:#374151;font-size:13px;">${c.why_it_matters||'N/A'}</span></div>
-    <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;"><span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br><span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead||'N/A'}</span></div>
-    <div><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br><span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out||'N/A'}</span></div>
+  <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
+  <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">❌ What happened</span><br><span style="color:#374151;font-size:13px;">${c.what_happened||'N/A'}</span></div>
+  <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br><span style="color:#374151;font-size:13px;">${c.why_it_matters||'N/A'}</span></div>
+  <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;"><span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br><span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead||'N/A'}</span></div>
+  <div><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br><span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out||'N/A'}</span></div>
   </div>`;
 }
 
@@ -33,11 +33,23 @@ function scoreRowHtml(label, score, max) {
   <tr><td colspan="2" style="padding:0 0 10px;"><div style="background:#e5e7eb;border-radius:9999px;height:5px;"><div style="background:${color};width:${pct}%;height:5px;border-radius:9999px;"></div></div></td></tr>`;
 }
 
-async function sendScorecardEmail(location, recording, scorecard) {
+async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
   const date = new Date(recording.recorded_at).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const dateShort = new Date(recording.recorded_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
   const scoreColor = scorecard.total_score>=70?'#22c55e':scorecard.total_score>=50?'#f59e0b':'#ef4444';
   const subject = `Consult Score — ${location.franchise_name} — ${dateShort} — ${scorecard.total_score}/100${scorecard.flagged_for_review?' ⚠️':''}`;
+
+  const audioTextBlock = audioUrl
+    ? `\n\n--- RECORDING ---\nListen / Download: ${audioUrl}\n(Link expires in 7 days)\n`
+    : '';
+
+  const audioHtmlBlock = audioUrl
+    ? `<div style="margin:24px 0;padding:16px 20px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;text-align:center;">
+        <div style="font-size:12px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🎧 Consultation Recording</div>
+        <a href="${audioUrl}" style="display:inline-block;padding:10px 24px;background:#0284c7;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Listen / Download Recording</a>
+        <div style="font-size:11px;color:#64748b;margin-top:8px;">Link expires in 7 days</div>
+      </div>`
+    : '';
 
   const transcriptText = recording.transcript
     ? `\n\n--- FULL TRANSCRIPT ---\n${recording.transcript}\n--- END TRANSCRIPT ---`
@@ -66,6 +78,7 @@ async function sendScorecardEmail(location, recording, scorecard) {
     coachingBlockText('2. Objection Handling', scorecard.objection_coaching),
     coachingBlockText('3. Language & Psychology', scorecard.language_coaching),
     coachingBlockText('4. Close Execution', scorecard.close_coaching),
+    audioTextBlock,
     '\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness',
     transcriptText
   ].join('\n');
@@ -94,6 +107,7 @@ async function sendScorecardEmail(location, recording, scorecard) {
         <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:5px;">Summary</div>
         <div style="font-size:13px;color:#15803d;">${scorecard.ai_summary}</div>
       </div>
+      ${audioHtmlBlock}
       <h2 style="font-size:15px;font-weight:800;color:#111;margin:24px 0 6px;">Coaching Notes</h2>
       <p style="font-size:12px;color:#6b7280;margin:0 0 14px;">Every word matters. The script is built on human psychology.</p>
       ${coachingBlockHtml('1. Sit-Down Presentation', scorecard.sitdown_coaching)}
@@ -109,7 +123,6 @@ async function sendScorecardEmail(location, recording, scorecard) {
 
   const franchiseeEmail = (location.franchisee_email || '').trim() || MIKE_EMAIL;
   const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL])];
-
   console.log('[Email] Attempting send to:', recipients.join(', '), '| from:', process.env.EMAIL_FROM || 'onboarding@resend.dev');
 
   const { data, error } = await resend.emails.send({
@@ -124,7 +137,6 @@ async function sendScorecardEmail(location, recording, scorecard) {
     console.error('[Email] Resend rejected send:', JSON.stringify(error));
     throw new Error('Resend error: ' + JSON.stringify(error));
   }
-
   console.log(`[Email] Delivered — id: ${data?.id} — to: ${recipients.join(', ')} — score: ${scorecard.total_score}`);
 }
 
