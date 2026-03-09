@@ -48,28 +48,34 @@ function getAllRecordings() {
 
 // ─── Scorecards ───────────────────────────────────────────
 
-function createScorecard({ recording_id, scores, coaching, ai_summary }) {
-  const scorecard = {
+function createScorecard({ recording_id, scorecard }) {
+  const entry = {
     scorecard_id: uuidv4(),
     recording_id,
-    total_score: scores.total_score,
-    rapport_score: scores.rapport_score,
-    presentation_score: scores.presentation_score,
-    objection_handling_score: scores.objection_handling_score,
-    close_attempt_score: scores.close_attempt_score,
-    followup_score: scores.followup_score,
-    ai_summary,
-    rapport_coaching: coaching.rapport_coaching,
-    presentation_coaching: coaching.presentation_coaching,
-    objection_coaching: coaching.objection_coaching,
-    close_coaching: coaching.close_coaching,
-    followup_coaching: coaching.followup_coaching,
-    flagged_for_review: scores.total_score < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70),
+    total_score: scorecard.total_score,
+    sitdown_score: scorecard.sitdown_score,
+    objection_score: scorecard.objection_score,
+    language_score: scorecard.language_score,
+    close_score: scorecard.close_score,
+    ai_summary: scorecard.ai_summary,
+    sitdown_coaching: typeof scorecard.sitdown_coaching === 'string'
+      ? scorecard.sitdown_coaching
+      : JSON.stringify(scorecard.sitdown_coaching),
+    objection_coaching: typeof scorecard.objection_coaching === 'string'
+      ? scorecard.objection_coaching
+      : JSON.stringify(scorecard.objection_coaching),
+    language_coaching: typeof scorecard.language_coaching === 'string'
+      ? scorecard.language_coaching
+      : JSON.stringify(scorecard.language_coaching),
+    close_coaching: typeof scorecard.close_coaching === 'string'
+      ? scorecard.close_coaching
+      : JSON.stringify(scorecard.close_coaching),
+    flagged_for_review: scorecard.total_score < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70),
     created_at: new Date().toISOString()
   };
-  scorecards.set(scorecard.scorecard_id, scorecard);
-  console.log(`[DB] Created scorecard ${scorecard.scorecard_id} — score: ${scorecard.total_score}`);
-  return scorecard;
+  scorecards.set(entry.scorecard_id, entry);
+  console.log(`[DB] Created scorecard ${entry.scorecard_id} — score: ${entry.total_score}`);
+  return entry;
 }
 
 function getScorecardByRecording(recording_id) {
