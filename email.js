@@ -39,6 +39,18 @@ async function sendScorecardEmail(location, recording, scorecard) {
   const scoreColor = scorecard.total_score>=70?'#22c55e':scorecard.total_score>=50?'#f59e0b':'#ef4444';
   const subject = `Consult Score — ${location.franchise_name} — ${dateShort} — ${scorecard.total_score}/100${scorecard.flagged_for_review?' ⚠️':''}`;
 
+  const transcriptText = recording.transcript
+    ? `\n\n--- FULL TRANSCRIPT ---\n${recording.transcript}\n--- END TRANSCRIPT ---`
+    : '';
+
+  const transcriptHtml = recording.transcript
+    ? `<div style="margin:32px 0 0;">
+        <h2 style="font-size:15px;font-weight:800;color:#111;margin:0 0 8px;padding-top:24px;border-top:2px solid #e5e7eb;">📝 Full Transcript</h2>
+        <p style="font-size:12px;color:#6b7280;margin:0 0 12px;">Raw transcription of the consultation audio.</p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px;font-size:13px;color:#374151;line-height:1.8;white-space:pre-wrap;">${recording.transcript}</div>
+      </div>`
+    : '';
+
   const text = [
     `Hi ${location.franchisee_name},`,
     `Here is your consultation scorecard for ${date}.`,
@@ -54,7 +66,8 @@ async function sendScorecardEmail(location, recording, scorecard) {
     coachingBlockText('2. Objection Handling', scorecard.objection_coaching),
     coachingBlockText('3. Language & Psychology', scorecard.language_coaching),
     coachingBlockText('4. Close Execution', scorecard.close_coaching),
-    '\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness'
+    '\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness',
+    transcriptText
   ].join('\n');
 
   const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -87,13 +100,13 @@ async function sendScorecardEmail(location, recording, scorecard) {
       ${coachingBlockHtml('2. Objection Handling', scorecard.objection_coaching)}
       ${coachingBlockHtml('3. Language & Psychology', scorecard.language_coaching)}
       ${coachingBlockHtml('4. Close Execution', scorecard.close_coaching)}
+      ${transcriptHtml}
     </div>
     <div style="background:#f9fafb;padding:16px 28px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af;">
       Keep working the process — the scores will follow. | Aira Fitness
     </div>
   </div></body></html>`;
 
-  // Always send to both franchisee and Mike; fall back to mikebell@ if not set
   const franchiseeEmail = (location.franchisee_email || '').trim() || MIKE_EMAIL;
   const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL])];
 
