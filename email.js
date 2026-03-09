@@ -1,126 +1,127 @@
-// email.js
-// ─────────────────────────────────────────────────────────
-// Sends scorecard emails via Resend.com
-// ─────────────────────────────────────────────────────────
+// email.js - Updated: new scorecard fields with rich coaching format
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+const MIKE_EMAIL = process.env.MIKE_EMAIL || 'mike@airafitness.com';
 
-const axios = require('axios');
-
-function scoreBar(score, max) {
-  const filled = Math.round((score / max) * 10);
-  const empty = 10 - filled;
-  return '█'.repeat(filled) + '░'.repeat(empty);
-}
-
-function gradeColor(score) {
-  if (score >= 80) return '#22c55e';
-  if (score >= 70) return '#f59e0b';
-  return '#ef4444';
-}
-
-async function sendScorecardEmail({ to, franchisee_name, date, scorecard, appointment_id }) {
-  const grade = scorecard.total_score >= 80 ? 'Good' : scorecard.total_score >= 70 ? 'Needs Work' : 'Action Required';
-  const color = gradeColor(scorecard.total_score);
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9f9f9; padding: 20px;">
-
-  <div style="background: #111; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: #c8f060; margin: 0; font-size: 22px; letter-spacing: 2px;">AIRA FITNESS</h1>
-    <p style="color: #888; margin: 4px 0 0; font-size: 13px; letter-spacing: 1px;">CONSULTATION SCORECARD</p>
-  </div>
-
-  <div style="background: white; padding: 32px; border-radius: 0 0 12px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-
-    <p style="color: #555; margin: 0 0 24px;">Hi ${franchisee_name},<br><br>
-    Here is your consultation scorecard for <strong>${date}</strong>.<br>
-    Appointment ID: <code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;">${appointment_id}</code></p>
-
-    <!-- Overall Score -->
-    <div style="text-align: center; background: #f8f8f8; border-radius: 12px; padding: 24px; margin-bottom: 28px; border: 2px solid ${color};">
-      <div style="font-size: 56px; font-weight: bold; color: ${color}; line-height: 1;">${scorecard.total_score}</div>
-      <div style="color: #888; font-size: 14px; margin-top: 4px;">OUT OF 100</div>
-      <div style="display: inline-block; background: ${color}; color: white; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-top: 8px;">${grade}</div>
-    </div>
-
-    <!-- Category Scores -->
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 28px;">
-      <tr style="background: #f0f0f0;">
-        <th style="padding: 10px 12px; text-align: left; font-size: 12px; color: #888; letter-spacing: 1px; text-transform: uppercase;">Category</th>
-        <th style="padding: 10px 12px; text-align: right; font-size: 12px; color: #888; letter-spacing: 1px; text-transform: uppercase;">Score</th>
-      </tr>
-      <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 12px;">Rapport</td>
-        <td style="padding: 12px; text-align: right; font-weight: bold; color: ${gradeColor(scorecard.rapport_score * 5)};">${scorecard.rapport_score} / 20</td>
-      </tr>
-      <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
-        <td style="padding: 12px;">Presentation</td>
-        <td style="padding: 12px; text-align: right; font-weight: bold; color: ${gradeColor(scorecard.presentation_score * 5)};">${scorecard.presentation_score} / 20</td>
-      </tr>
-      <tr style="border-bottom: 1px solid #f0f0f0;">
-        <td style="padding: 12px;">Objection Handling</td>
-        <td style="padding: 12px; text-align: right; font-weight: bold; color: ${gradeColor(scorecard.objection_handling_score * 5)};">${scorecard.objection_handling_score} / 20</td>
-      </tr>
-      <tr style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
-        <td style="padding: 12px;">The Close</td>
-        <td style="padding: 12px; text-align: right; font-weight: bold; color: ${gradeColor(scorecard.close_attempt_score * 5)};">${scorecard.close_attempt_score} / 20</td>
-      </tr>
-      <tr>
-        <td style="padding: 12px;">Follow Up</td>
-        <td style="padding: 12px; text-align: right; font-weight: bold; color: ${gradeColor(scorecard.followup_score * 5)};">${scorecard.followup_score} / 20</td>
-      </tr>
-    </table>
-
-    <!-- AI Summary -->
-    <div style="background: #f0f7ff; border-left: 4px solid #3b82f6; padding: 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
-      <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: bold; margin-bottom: 6px;">AI SUMMARY</p>
-      <p style="margin: 0; color: #334155; font-size: 14px; line-height: 1.6;">${scorecard.ai_summary}</p>
-    </div>
-
-    <!-- Coaching Notes -->
-    <h3 style="color: #111; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px;">Coaching Notes</h3>
-
-    ${[
-      { label: 'Rapport', note: scorecard.rapport_coaching },
-      { label: 'Presentation', note: scorecard.presentation_coaching },
-      { label: 'Objection Handling', note: scorecard.objection_coaching },
-      { label: 'The Close', note: scorecard.close_coaching },
-      { label: 'Follow Up', note: scorecard.followup_coaching }
-    ].map(({ label, note }) => `
-    <div style="margin-bottom: 16px; padding: 14px; background: #fafafa; border-radius: 8px; border: 1px solid #e5e5e5;">
-      <p style="margin: 0 0 6px; font-weight: bold; color: #111; font-size: 13px;">${label}</p>
-      <p style="margin: 0; color: #555; font-size: 13px; line-height: 1.6;">${note}</p>
-    </div>`).join('')}
-
-    <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0;">
-    <p style="color: #888; font-size: 13px; text-align: center; margin: 0;">
-      Keep working the process — the scores will follow.<br>
-      <strong style="color: #111;">Aira Fitness</strong>
-    </p>
-
-  </div>
-</body>
-</html>`;
-
-  await axios.post(
-    'https://api.resend.com/emails',
-    {
-      from: process.env.EMAIL_FROM,
-      to: [to],
-      subject: `Consult Score — ${franchisee_name} — ${date} — ${scorecard.total_score}/100`,
-      html
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+function parseCoaching(raw) {
+    if (typeof raw === 'object' && raw !== null) return raw;
+    try { return JSON.parse(raw); } catch {
+        return { what_happened: raw || '', why_it_matters: '', what_to_say_instead: '', how_it_would_have_played_out: '' };
     }
-  );
+}
 
-  console.log(`[Email] Scorecard sent to ${to}`);
+function coachingBlockText(label, raw) {
+    const c = parseCoaching(raw);
+    return [
+        `--- ${label.toUpperCase()} ---`,
+        `What happened: ${c.what_happened || 'N/A'}`,
+        `Why it matters: ${c.why_it_matters || 'N/A'}`,
+        `What to say instead: ${c.what_to_say_instead || 'N/A'}`,
+        `How it would have played out: ${c.how_it_would_have_played_out || 'N/A'}`
+    ].join('\n');
+}
+
+function coachingBlockHtml(label, raw) {
+    const c = parseCoaching(raw);
+    return `<div style="margin:20px 0;padding:18px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
+        <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
+        <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">❌ What happened</span><br><span style="color:#374151;font-size:13px;">${c.what_happened || 'N/A'}</span></div>
+        <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br><span style="color:#374151;font-size:13px;">${c.why_it_matters || 'N/A'}</span></div>
+        <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;"><span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br><span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead || 'N/A'}</span></div>
+        <div><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br><span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out || 'N/A'}</span></div>
+    </div>`;
+}
+
+function scoreRowHtml(label, score, max) {
+    const pct = Math.round((score / max) * 100);
+    const color = pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+    return `<tr>
+        <td style="padding:6px 0;font-size:13px;color:#374151;">${label}</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;color:${color};">${score}/${max}</td>
+    </tr>
+    <tr><td colspan="2" style="padding:0 0 10px;"><div style="background:#e5e7eb;border-radius:9999px;height:5px;"><div style="background:${color};width:${pct}%;height:5px;border-radius:9999px;"></div></div></td></tr>`;
+}
+
+async function sendScorecardEmail(location, recording, scorecard) {
+    const date = new Date(recording.recorded_at).toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const dateShort = new Date(recording.recorded_at).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
+    });
+    const scoreColor = scorecard.total_score >= 70 ? '#22c55e' : scorecard.total_score >= 50 ? '#f59e0b' : '#ef4444';
+    const flagNote = scorecard.flagged_for_review ? '\n⚠️ This consultation has been flagged for review by Mike.\n' : '';
+
+    const subject = `Consult Score — ${location.franchise_name} — ${dateShort} — ${scorecard.total_score}/100${scorecard.flagged_for_review ? ' ⚠️' : ''}`;
+
+    // Plain text
+    const text = [
+        `Hi ${location.franchisee_name},`,
+        `Here is your consultation scorecard for ${date}.`,
+        flagNote,
+        `OVERALL SCORE: ${scorecard.total_score}/100`,
+        `Sit-Down Presentation: ${scorecard.sitdown_score}/25`,
+        `Objection Handling:    ${scorecard.objection_score}/25`,
+        `Language Precision:    ${scorecard.language_score}/25`,
+        `Close Execution:       ${scorecard.close_score}/25`,
+        `\nSUMMARY:\n${scorecard.ai_summary}`,
+        `\nCOACHING NOTES:\n`,
+        coachingBlockText('1. Sit-Down Presentation', scorecard.sitdown_coaching),
+        coachingBlockText('2. Objection Handling', scorecard.objection_coaching),
+        coachingBlockText('3. Language & Psychology', scorecard.language_coaching),
+        coachingBlockText('4. Close Execution', scorecard.close_coaching),
+        `\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness`
+    ].join('\n');
+
+    // HTML
+    const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+        <div style="background:#111;padding:22px 28px;">
+            <div style="font-size:18px;font-weight:800;color:#fff;">AIRA FITNESS</div>
+            <div style="font-size:12px;color:#9ca3af;margin-top:3px;">Consultation Scorecard — ${date}</div>
+        </div>
+        <div style="padding:28px;">
+            <p style="margin:0 0 20px;color:#374151;">Hi ${location.franchisee_name},</p>
+            ${scorecard.flagged_for_review ? '<div style="background:#fff3cd;border-left:4px solid #ffc107;padding:10px 14px;margin-bottom:18px;border-radius:4px;">⚠️ <strong>This consultation has been flagged for review by Mike.</strong></div>' : ''}
+            <div style="text-align:center;padding:20px;background:#f9fafb;border-radius:8px;margin-bottom:20px;">
+                <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">Overall Score</div>
+                <div style="font-size:52px;font-weight:900;color:${scoreColor};line-height:1.1;">${scorecard.total_score}</div>
+                <div style="font-size:14px;color:#9ca3af;">/ 100</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;">
+                ${scoreRowHtml('Sit-Down Presentation', scorecard.sitdown_score, 25)}
+                ${scoreRowHtml('Objection Handling', scorecard.objection_score, 25)}
+                ${scoreRowHtml('Language & Psychology', scorecard.language_score, 25)}
+                ${scoreRowHtml('Close Execution', scorecard.close_score, 25)}
+            </table>
+            <div style="padding:14px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;margin:20px 0;">
+                <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:5px;">Summary</div>
+                <div style="font-size:13px;color:#15803d;">${scorecard.ai_summary}</div>
+            </div>
+            <h2 style="font-size:15px;font-weight:800;color:#111;margin:24px 0 6px;">Coaching Notes</h2>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 14px;">Every word matters. The script is built on human psychology.</p>
+            ${coachingBlockHtml('1. Sit-Down Presentation', scorecard.sitdown_coaching)}
+            ${coachingBlockHtml('2. Objection Handling', scorecard.objection_coaching)}
+            ${coachingBlockHtml('3. Language & Psychology', scorecard.language_coaching)}
+            ${coachingBlockHtml('4. Close Execution', scorecard.close_coaching)}
+        </div>
+        <div style="background:#f9fafb;padding:16px 28px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af;">
+            Keep working the process — the scores will follow. | Aira Fitness
+        </div>
+    </div></body></html>`;
+
+    const recipients = [location.franchisee_email];
+    if (!recipients.includes(MIKE_EMAIL)) recipients.push(MIKE_EMAIL);
+
+    await resend.emails.send({
+        from: process.env.EMAIL_FROM,
+        to: recipients,
+        subject,
+        text,
+        html
+    });
+
+    console.log(`[Email] Sent to ${recipients.join(', ')} — score: ${scorecard.total_score}`);
 }
 
 module.exports = { sendScorecardEmail };
