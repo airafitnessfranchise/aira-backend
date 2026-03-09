@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────
 const locations = [
   {
-        location_id: "Fox Lake ",
+        location_id: "Fox-Lake-01",
         franchise_name: "Aira Fitness Fox Lake",
         franchisee_name: "Fox Lake Gym Test employee",
         franchisee_email: "mikebell@airafitness.com",
