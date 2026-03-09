@@ -2,7 +2,6 @@
 // ─────────────────────────────────────────────────────────
 // Simple in-memory database for Phase 1.
 // All data lives in memory — resets on server restart.
-// In Phase 2 we'll swap this for Supabase Postgres.
 // ─────────────────────────────────────────────────────────
 
 const { v4: uuidv4 } = require('uuid');
@@ -21,10 +20,10 @@ function createRecording({ appointment_id, location_id, duration_seconds, audio_
     transcript: null,
     duration_seconds: duration_seconds || 0,
     recorded_at: new Date().toISOString(),
-    processing_status: 'pending' // pending → transcribed → scored → failed
+    processing_status: 'pending'
   };
   recordings.set(recording.recording_id, recording);
-  console.log(`[DB] Created recording ${recording.recording_id} for appt ${appointment_id}`);
+  console.log('[DB] Created recording ' + recording.recording_id + ' for appt ' + appointment_id);
   return recording;
 }
 
@@ -47,34 +46,31 @@ function getAllRecordings() {
 }
 
 // ─── Scorecards ───────────────────────────────────────────
+// Accepts both call shapes:
+//   New:    { recording_id, scorecard }
+//   Legacy: { recording_id, scores, coaching, ai_summary }
 
-function createScorecard({ recording_id, scorecard }) {
+function createScorecard({ recording_id, scorecard, scores, coaching, ai_summary }) {
+  const sc = scorecard || Object.assign({}, scores, coaching, { ai_summary });
+  const flat = (val) => typeof val === 'string' ? val : JSON.stringify(val || {});
   const entry = {
     scorecard_id: uuidv4(),
     recording_id,
-    total_score: scorecard.total_score,
-    sitdown_score: scorecard.sitdown_score,
-    objection_score: scorecard.objection_score,
-    language_score: scorecard.language_score,
-    close_score: scorecard.close_score,
-    ai_summary: scorecard.ai_summary,
-    sitdown_coaching: typeof scorecard.sitdown_coaching === 'string'
-      ? scorecard.sitdown_coaching
-      : JSON.stringify(scorecard.sitdown_coaching),
-    objection_coaching: typeof scorecard.objection_coaching === 'string'
-      ? scorecard.objection_coaching
-      : JSON.stringify(scorecard.objection_coaching),
-    language_coaching: typeof scorecard.language_coaching === 'string'
-      ? scorecard.language_coaching
-      : JSON.stringify(scorecard.language_coaching),
-    close_coaching: typeof scorecard.close_coaching === 'string'
-      ? scorecard.close_coaching
-      : JSON.stringify(scorecard.close_coaching),
-    flagged_for_review: scorecard.total_score < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70),
+    total_score: sc.total_score || 0,
+    sitdown_score: sc.sitdown_score || 0,
+    objection_score: sc.objection_score || 0,
+    language_score: sc.language_score || 0,
+    close_score: sc.close_score || 0,
+    ai_summary: sc.ai_summary || '',
+    sitdown_coaching: flat(sc.sitdown_coaching),
+    objection_coaching: flat(sc.objection_coaching),
+    language_coaching: flat(sc.language_coaching),
+    close_coaching: flat(sc.close_coaching),
+    flagged_for_review: (sc.total_score || 0) < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70),
     created_at: new Date().toISOString()
   };
   scorecards.set(entry.scorecard_id, entry);
-  console.log(`[DB] Created scorecard ${entry.scorecard_id} — score: ${entry.total_score}`);
+  console.log('[DB] Created scorecard ' + entry.scorecard_id + ' score: ' + entry.total_score);
   return entry;
 }
 
