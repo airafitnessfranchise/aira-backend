@@ -98,40 +98,42 @@ STEP 4 - OVERALL CLOSE EXECUTION (0-25 points)
 
 RETURN ONLY valid JSON, no other text, no markdown:
 
+IMPORTANT — COACHING FORMAT RULES:
+Each coaching section has 3 fields:
+1. "what_you_said" — Pull the most relevant exact quote from the transcript for this section. If nothing relevant was said, write "Not captured in transcript."
+2. "what_to_say_instead" — ONLY include this if there is a genuine gap or improvement. If they said it perfectly, write null.
+3. "coaching_note" — ONE conversational paragraph written like a coach talking directly to the franchisee. If they nailed it, keep it short and genuinely celebratory (2-3 sentences max). If there's a real gap, explain what happened, why it matters psychologically, and what to do differently. Let the LENGTH reflect the performance — short = great, long = needs work. Never manufacture critique on a strong section just to fill space.
+
 {
   "total_score": 0,
   "sitdown_score": 0,
   "objection_score": 0,
   "language_score": 0,
   "close_score": 0,
-  "ai_summary": "Two sentences: start with one specific genuine strength from this consult, then one key opportunity to improve. Never lead with a negative.",
+  "ai_summary": "Two sentences: start with one specific genuine strength, then one key opportunity. Never lead with a negative.",
   "sitdown_coaching": {
-    "what_they_did_well": "One specific, genuine thing they did well in the sit-down. Be precise, not vague.",
-    "opportunity": "Where momentum was lost or a step was missed — use coaching language, never shaming language.",
-    "why_it_matters": "Explanation grounded in human psychology — why this moment matters for the prospect.",
-    "what_to_say_instead": "The exact Aira script phrasing that would work best here.",
-    "how_it_would_have_played_out": "How the prospect would likely have responded if the script was followed."
+    "what_they_did_well": "One specific, genuine thing they did well in the sit-down.",
+    "what_you_said": "Exact quote from transcript most relevant to the sit-down presentation.",
+    "what_to_say_instead": "The stronger Aira phrasing — or null if they nailed it.",
+    "coaching_note": "One conversational paragraph. Short and celebratory if strong. Detailed with psychology if gap exists."
   },
   "objection_coaching": {
-    "what_they_did_well": "One specific, genuine thing they did well handling objections, or how they stayed calm. If no objection arose, acknowledge that the consult flowed smoothly.",
-    "opportunity": "Where the objection handling could be stronger — use coaching language, never shaming language.",
-    "why_it_matters": "Psychology behind why the Aira objection sequence works.",
-    "what_to_say_instead": "The exact Aira objection script that fits this situation.",
-    "how_it_would_have_played_out": "How following the script would have redirected the prospect."
+    "what_they_did_well": "One specific, genuine thing they did well handling objections, or note that the consult flowed cleanly with no major objections.",
+    "what_you_said": "Exact quote from transcript most relevant to objection handling.",
+    "what_to_say_instead": "The stronger Aira phrasing — or null if they nailed it.",
+    "coaching_note": "One conversational paragraph. Short and celebratory if strong. Detailed with psychology if gap exists."
   },
   "language_coaching": {
-    "what_they_did_well": "One specific word choice or phrase they used that was confident, assumptive, or warm.",
-    "opportunity": "A specific word or phrase that could be stronger — use coaching language, e.g. 'this moment could be stronger by...'",
-    "why_it_matters": "Why that specific word choice matters to the prospect's psychology.",
-    "what_to_say_instead": "The stronger Aira-aligned phrasing to use instead.",
-    "how_it_would_have_played_out": "How the prospect would have responded to the stronger phrasing."
+    "what_they_did_well": "One specific word choice or phrase that was confident, assumptive, or warm.",
+    "what_you_said": "Exact quote from transcript most relevant to language and psychology.",
+    "what_to_say_instead": "The stronger Aira phrasing — or null if language was solid.",
+    "coaching_note": "One conversational paragraph. Short and celebratory if strong. Detailed with psychology if gap exists."
   },
   "close_coaching": {
-    "what_they_did_well": "One specific thing they did well in the close — directness, persistence, warmth, or urgency.",
-    "opportunity": "Where the close could have been stronger — use coaching language, e.g. 'an opportunity here would have been...'",
-    "why_it_matters": "The psychology of commitment and why a confident close gives the prospect permission to say yes.",
-    "what_to_say_instead": "The exact Aira close language that fits this situation.",
-    "how_it_would_have_played_out": "How a confident scripted close would have shifted the prospect's decision."
+    "what_they_did_well": "One specific thing they did well in the close.",
+    "what_you_said": "Exact quote from transcript most relevant to the close.",
+    "what_to_say_instead": "The stronger Aira close phrasing — or null if they closed well.",
+    "coaching_note": "One conversational paragraph. Short and celebratory if strong. Detailed with psychology if gap exists."
   },
   "flagged_for_review": false
 }
