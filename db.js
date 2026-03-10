@@ -11,11 +11,12 @@ const scorecards = new Map();
 
 // ─── Recordings ───────────────────────────────────────────
 
-function createRecording({ appointment_id, location_id, duration_seconds, audio_file_url }) {
+function createRecording({ appointment_id, location_id, duration_seconds, audio_file_url, contact_name }) {
   const recording = {
     recording_id: uuidv4(),
     appointment_id,
     location_id,
+    contact_name: contact_name || 'Walk-in',
     audio_file_url: audio_file_url || null,
     transcript: null,
     duration_seconds: duration_seconds || 0,
