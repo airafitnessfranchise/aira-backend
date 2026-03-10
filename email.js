@@ -6,26 +6,52 @@ const MIKE_EMAIL = process.env.MIKE_EMAIL || 'mikebell@airafitness.com';
 function parseCoaching(raw) {
   if (typeof raw === 'object' && raw !== null) return raw;
   try { return JSON.parse(raw); } catch {
-    return { what_happened: raw || '', why_it_matters: '', what_to_say_instead: '', how_it_would_have_played_out: '' };
+    return { what_they_did_well: '', opportunity: raw || '', why_it_matters: '', what_to_say_instead: '', how_it_would_have_played_out: '' };
   }
 }
-
 function coachingBlockText(label, raw) {
   const c = parseCoaching(raw);
-  return [`--- ${label.toUpperCase()} ---`, `What happened: ${c.what_happened||'N/A'}`, `Why it matters: ${c.why_it_matters||'N/A'}`, `What to say instead: ${c.what_to_say_instead||'N/A'}`, `How it would have played out: ${c.how_it_would_have_played_out||'N/A'}`].join('\n');
+  return [
+    `--- ${label.toUpperCase()} ---`,
+    c.what_they_did_well ? `What you did well: ${c.what_they_did_well}` : '',
+    `Opportunity: ${c.opportunity || c.what_happened || 'N/A'}`,
+    `Why it matters: ${c.why_it_matters || 'N/A'}`,
+    `What to say instead: ${c.what_to_say_instead || 'N/A'}`,
+    `How it would have played out: ${c.how_it_would_have_played_out || 'N/A'}`
+  ].filter(Boolean).join('\n');
 }
-
 function coachingBlockHtml(label, raw) {
   const c = parseCoaching(raw);
+  const wellBlock = c.what_they_did_well
+    ? `<div style="margin-bottom:12px;padding:10px 14px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;">
+        <span style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;">⭐ What you did well</span><br>
+        <span style="color:#15803d;font-size:13px;">${c.what_they_did_well}</span>
+      </div>`
+    : '';
+  const oppText = c.opportunity || c.what_happened || '';
+  const oppBlock = oppText
+    ? `<div style="margin-bottom:10px;">
+        <span style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;">💡 Opportunity</span><br>
+        <span style="color:#374151;font-size:13px;">${oppText}</span>
+      </div>`
+    : '';
   return `<div style="margin:20px 0;padding:18px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
-  <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
-  <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">❌ What happened</span><br><span style="color:#374151;font-size:13px;">${c.what_happened||'N/A'}</span></div>
-  <div style="margin-bottom:10px;"><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br><span style="color:#374151;font-size:13px;">${c.why_it_matters||'N/A'}</span></div>
-  <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;"><span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br><span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead||'N/A'}</span></div>
-  <div><span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br><span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out||'N/A'}</span></div>
+    <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
+    ${wellBlock}${oppBlock}
+    <div style="margin-bottom:10px;">
+      <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br>
+      <span style="color:#374151;font-size:13px;">${c.why_it_matters || 'N/A'}</span>
+    </div>
+    <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;">
+      <span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br>
+      <span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead || 'N/A'}</span>
+    </div>
+    <div>
+      <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br>
+      <span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out || 'N/A'}</span>
+    </div>
   </div>`;
 }
-
 function scoreRowHtml(label, score, max) {
   const pct = Math.round((score/max)*100);
   const color = pct>=70?'#22c55e':pct>=50?'#f59e0b':'#ef4444';
@@ -117,7 +143,7 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
       ${transcriptHtml}
     </div>
     <div style="background:#f9fafb;padding:16px 28px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af;">
-      Keep working the process — the scores will follow. | Aira Fitness
+      ${scorecard.total_score >= 85 ? "Outstanding work — keep setting the standard." : scorecard.total_score >= 70 ? "Solid consult — keep working the process and the scores will follow." : "Every rep makes you better — keep going."} | Aira Fitness
     </div>
   </div></body></html>`;
 
