@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { byCalendarId, byLocationId } = require('./locations');
-const db = require('./db');
+const db = require('./b');
 const { transcribeAudio, scoreTranscript } = require('./ai');
 const { sendScorecardEmail } = require('./email');
 const { uploadToR2, getPresignedUrl } = require('./storage');
@@ -130,7 +130,12 @@ app.post('/upload/recording', upload.single('audio_file'), async (req, res) => {
 });
 
 async function processRecording(recording_id, audioFilePath, location_id, appointment_id) {
-  const location = byLocationId[location_id];
+  const location = byLocationId[location_id] || {
+    location_id: location_id || 'unknown',
+    franchise_name: 'Walk-in / Unknown Location',
+    franchisee_name: 'Franchisee',
+    franchisee_email: process.env.MIKE_EMAIL || 'mikebell@airafitness.com'
+  };
   try {
     // --- Upload to R2 ---
     console.log('[Pipeline] Uploading to R2: ' + recording_id);
@@ -164,12 +169,7 @@ async function processRecording(recording_id, audioFilePath, location_id, appoin
 
       const threshold = parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70;
       if (savedScorecard.total_score < threshold) {
-        console.log('[Pipeline] Score ' + savedScorecard.total_score + ' below threshold — flagging');
-        const mikeLocation = Object.assign({}, location, {
-          franchisee_name: location.franchisee_name + ' - FLAGGED',
-          franchisee_email: process.env.MIKE_EMAIL || 'mikebell@airafitness.com'
-        });
-        await sendScorecardEmail(mikeLocation, recording, savedScorecard, audioUrl);
+        console.log('[Pipeline] Score ' + savedScorecard.total_score + ' below threshold — flagged (Mike notified via email CC)');
       }
     }
 
