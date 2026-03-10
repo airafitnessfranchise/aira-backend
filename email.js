@@ -6,52 +6,58 @@ const MIKE_EMAIL = process.env.MIKE_EMAIL || 'mikebell@airafitness.com';
 function parseCoaching(raw) {
   if (typeof raw === 'object' && raw !== null) return raw;
   try { return JSON.parse(raw); } catch {
-    return { what_they_did_well: '', opportunity: raw || '', why_it_matters: '', what_to_say_instead: '', how_it_would_have_played_out: '' };
+    return { what_they_did_well: '', what_you_said: '', what_to_say_instead: null, coaching_note: raw || '' };
   }
 }
+
 function coachingBlockText(label, raw) {
   const c = parseCoaching(raw);
-  return [
-    `--- ${label.toUpperCase()} ---`,
-    c.what_they_did_well ? `What you did well: ${c.what_they_did_well}` : '',
-    `Opportunity: ${c.opportunity || c.what_happened || 'N/A'}`,
-    `Why it matters: ${c.why_it_matters || 'N/A'}`,
-    `What to say instead: ${c.what_to_say_instead || 'N/A'}`,
-    `How it would have played out: ${c.how_it_would_have_played_out || 'N/A'}`
-  ].filter(Boolean).join('\n');
+  const lines = [`--- ${label.toUpperCase()} ---`];
+  if (c.what_they_did_well) lines.push(`What you did well: ${c.what_they_did_well}`);
+  if (c.what_you_said) lines.push(`What you said: ${c.what_you_said}`);
+  if (c.what_to_say_instead) lines.push(`What to say instead: ${c.what_to_say_instead}`);
+  if (c.coaching_note) lines.push(c.coaching_note);
+  return lines.join('\n');
 }
+
 function coachingBlockHtml(label, raw) {
   const c = parseCoaching(raw);
+
   const wellBlock = c.what_they_did_well
     ? `<div style="margin-bottom:12px;padding:10px 14px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;">
-        <span style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;">⭐ What you did well</span><br>
+        <span style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.04em;">⭐ What you did well</span><br>
         <span style="color:#15803d;font-size:13px;">${c.what_they_did_well}</span>
       </div>`
     : '';
-  const oppText = c.opportunity || c.what_happened || '';
-  const oppBlock = oppText
-    ? `<div style="margin-bottom:10px;">
-        <span style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;">💡 Opportunity</span><br>
-        <span style="color:#374151;font-size:13px;">${oppText}</span>
+
+  const saidBlock = c.what_you_said
+    ? `<div style="margin-bottom:6px;">
+        <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;">🗣 What you said</span><br>
+        <span style="color:#374151;font-size:13px;font-style:italic;">"${c.what_you_said}"</span>
       </div>`
     : '';
+
+  const insteadBlock = c.what_to_say_instead
+    ? `<div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;">
+        <span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.04em;">✅ What to say instead</span><br>
+        <span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead}</span>
+      </div>`
+    : '';
+
+  const compareBlock = (saidBlock || insteadBlock)
+    ? `<div style="margin-bottom:12px;">${saidBlock}${insteadBlock}</div>`
+    : '';
+
+  const noteBlock = c.coaching_note
+    ? `<div style="color:#374151;font-size:13px;line-height:1.6;">${c.coaching_note}</div>`
+    : '';
+
   return `<div style="margin:20px 0;padding:18px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;">
     <h3 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#111;">${label}</h3>
-    ${wellBlock}${oppBlock}
-    <div style="margin-bottom:10px;">
-      <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">🧠 Why it matters</span><br>
-      <span style="color:#374151;font-size:13px;">${c.why_it_matters || 'N/A'}</span>
-    </div>
-    <div style="margin-bottom:10px;padding:10px;background:#eff6ff;border-left:3px solid #3b82f6;border-radius:4px;">
-      <span style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">✅ What to say instead</span><br>
-      <span style="color:#1e40af;font-size:13px;font-style:italic;">${c.what_to_say_instead || 'N/A'}</span>
-    </div>
-    <div>
-      <span style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;">➡️ How it would have played out</span><br>
-      <span style="color:#374151;font-size:13px;">${c.how_it_would_have_played_out || 'N/A'}</span>
-    </div>
+    ${wellBlock}${compareBlock}${noteBlock}
   </div>`;
 }
+
 function scoreRowHtml(label, score, max) {
   const pct = Math.round((score/max)*100);
   const color = pct>=70?'#22c55e':pct>=50?'#f59e0b':'#ef4444';
