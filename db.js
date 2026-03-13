@@ -1,16 +1,10 @@
 // db.js
-// ─────────────────────────────────────────────────────────
-// Simple in-memory database for Phase 1.
-// All data lives in memory — resets on server restart.
-// ─────────────────────────────────────────────────────────
-
 const { v4: uuidv4 } = require('uuid');
 
 const recordings = new Map();
 const scorecards = new Map();
 
 // ─── Recordings ───────────────────────────────────────────
-
 function createRecording({ appointment_id, location_id, duration_seconds, audio_file_url, contact_name }) {
   const recording = {
     recording_id: uuidv4(),
@@ -47,26 +41,18 @@ function getAllRecordings() {
 }
 
 // ─── Scorecards ───────────────────────────────────────────
-// Accepts both call shapes:
-//   New:    { recording_id, scorecard }
-//   Legacy: { recording_id, scores, coaching, ai_summary }
-
-function createScorecard({ recording_id, scorecard, scores, coaching, ai_summary }) {
-  const sc = scorecard || Object.assign({}, scores, coaching, { ai_summary });
-  const flat = (val) => typeof val === 'string' ? val : JSON.stringify(val || {});
+function createScorecard({ recording_id, scorecard }) {
+  const sc = scorecard || {};
   const entry = {
     scorecard_id: uuidv4(),
     recording_id,
-    total_score: sc.total_score || 0,
-    sitdown_score: sc.sitdown_score || 0,
-    objection_score: sc.objection_score || 0,
-    language_score: sc.language_score || 0,
-    close_score: sc.close_score || 0,
-    ai_summary: sc.ai_summary || '',
-    sitdown_coaching: flat(sc.sitdown_coaching),
-    objection_coaching: flat(sc.objection_coaching),
-    language_coaching: flat(sc.language_coaching),
-    close_coaching: flat(sc.close_coaching),
+    total_score:      sc.total_score      || 0,
+    sitdown_score:    sc.sitdown_score    || 0,
+    objection_score:  sc.objection_score  || 0,
+    language_score:   sc.language_score   || 0,
+    close_score:      sc.close_score      || 0,
+    ai_summary:       sc.ai_summary       || '',
+    coaching_note:    sc.coaching_note    || '',
     flagged_for_review: (sc.total_score || 0) < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70),
     created_at: new Date().toISOString()
   };
