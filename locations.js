@@ -17,7 +17,7 @@ const locations = [
         franchisee_name: "Mishawaka Gym Employee",
         franchisee_email: "airafitnessmishawaka@gmail.com",
         vp_email: "Akathan24@gmail.com",
-        ghl_calendar_id: ""  // To be filled in later
+        ghl_calendar_id: "K3ddQpv8XLAizml9p8sF"
   },
 ];
 
