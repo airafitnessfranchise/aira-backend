@@ -11,7 +11,15 @@ const locations = [
         franchisee_email: "mikebell@airafitness.com",
         ghl_calendar_id: "e5CB1cSvhcY6dlWEUUjI"
   },
-  ];
+  {
+        location_id: "Mishawaka-01",
+        franchise_name: "Aira Fitness Mishawaka",
+        franchisee_name: "Mishawaka Gym Employee",
+        franchisee_email: "airafitnessmishawaka@gmail.com",
+        vp_email: "Akathan24@gmail.com",
+        ghl_calendar_id: ""  // To be filled in later
+  },
+];
 
 // Build lookup maps
 const byCalendarId = {};
