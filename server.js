@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { byCalendarId, byLocationId } = require('./locations');
-const db = require('./db');
+const { initDb, ...db } = require('./db');
 const { transcribeAudio, scoreTranscript } = require('./ai');
 const { sendScorecardEmail } = require('./email');
 const { uploadToR2, getPresignedUrl } = require('./storage');
@@ -226,7 +226,12 @@ app.post('/test/trigger', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log('Aira backend running on port ' + PORT);
-  console.log('[Locations] ' + Object.keys(byLocationId).length + ' location(s) loaded');
+initDb().then(() => {
+  server.listen(PORT, () => {
+    console.log('Aira backend running on port ' + PORT);
+    console.log('[Locations] ' + Object.keys(byLocationId).length + ' location(s) loaded');
+  });
+}).catch(err => {
+  console.error('[DB] Failed to init:', err.message);
+  process.exit(1);
 });
