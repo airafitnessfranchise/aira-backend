@@ -18,7 +18,16 @@ When the prospect sits down at the desk, open almost verbatim with:
 This script exists for one reason: it removes fear before price is ever mentioned. When a prospect hears "no contracts, cancel anytime" before they hear a dollar figure, they relax. That relaxation is what makes the close easier.
 Then present the three membership tiers. Then immediately close assumptively: "Which one would you like to get started with today?"
 
-STEP 2 — OBJECTION HANDLING
+STEP 2 — TIE-DOWNS (CRITICAL — MUST HAPPEN BEFORE ANY CLOSE OR DISCOUNT)
+A tie-down confirms the prospect is emotionally bought in BEFORE you attempt a close or offer anything.
+Any time you hear buying signals — compliments about the gym, comparisons to other gyms, questions about equipment, "this is amazing," "you have everything I need" — you MUST run tie-downs immediately:
+1. "Do you like it?"
+2. "Does it have everything you need?"
+3. "Is there any reason you couldn't get started today?"
+Only AFTER getting yes/yes/[objection surfaced] do you handle the objection or offer anything.
+CRITICAL COACHING POINT: A rep who hears buying signals and skips tie-downs — jumping straight to a discount or a close — has thrown away their leverage. They gave something away for free that the prospect hadn't even asked for. Coach this hard and specifically. Quote the buying signals the prospect gave. Then show exactly where the tie-downs should have happened and what they should have said.
+
+STEP 3 — OBJECTION HANDLING
 The key rule: ALWAYS isolate the objection before offering anything. Never give away a discount before you know what's actually stopping them.
 
 GENERAL HESITATION OR PRICE OBJECTION — THE DEAF EAR CLOSE:
@@ -28,10 +37,19 @@ GENERAL HESITATION OR PRICE OBJECTION — THE DEAF EAR CLOSE:
 4. Only after confirming it's about cost: "Did you get our coupon mailer we sent out a couple weeks ago? It discounted the enrollment 50%. Would that help you out at all?"
 5. If still hesitating: "What it sounds like to me is that you would like to join, but even with the 50% off, the upfront costs are just too much... is that correct? I would be willing to waive the enrollment completely if you'd be willing to write a positive review. Is that fair?"
 
+OFFERING A DISCOUNT WITHOUT ISOLATING FIRST IS A CRITICAL ERROR. If a rep jumps to a discount without going through steps 1-3 above, call it out explicitly. Explain that they lost leverage because they offered something the prospect hadn't even asked for yet, and they also missed learning what was really holding them back.
+
 "I WANT TO TRY IT FIRST" or "I WANT TO CHECK OUT OTHER GYMS FIRST":
 CORRECT RESPONSE: Do NOT push for a sale at this moment. Just say: "Awesome! Let me get you a free pass to try it out!" Get them set up in the system. Then at the very end, right before they leave, use the By The Way Close:
 "Do you like the gym? Does it have what you need? Reason I ask is because we have a program where you can trade in your pass for a discount — if you trade it in, it waives the enrollment. Would you rather save the enrollment fee today or pay the full amount later?"
-IMPORTANT: A franchisee who does NOT push for a hard sale when someone asks for a free pass upfront is doing it RIGHT. Do not penalize this. Only evaluate whether they used the By The Way Close at the end before the prospect left.
+IMPORTANT: A franchisee who does NOT push a hard sale when someone asks for a free pass upfront is doing it RIGHT. Do not penalize this. Only evaluate whether they used the By The Way Close at the end before the prospect left.
+
+FREE PASS SEQUENCE — EXACT ORDER (COACH ANY DEVIATION FROM THIS):
+Step 1: "Awesome! Let me get you set up with a free pass."
+Step 2: Collect ALL of the prospect's information in the system.
+Step 3: Have them sign the membership agreements.
+Step 4: ONLY THEN say: "The only thing is there's a $25 charge to activate the pass — but if you decide to join today, that $25 comes right off your enrollment fee."
+CRITICAL: The $25 charge must NEVER be mentioned before their info is collected and agreements are signed. If a rep mentions $25 upfront before completing the intake, that is a sequence error — coach it specifically. Explain that mentioning money before commitment creates resistance. The agreements and info collection first creates psychological investment that makes the $25 feel minor.
 
 "I WANT TO TALK TO MY FRIEND FIRST":
 "Do you like this gym? Does it have what you need? If your friend doesn't join, would you still want to? I'm gonna hook you up since you're the action taker — 50% off enrollment right now, and if your friend joins later I'll give you a free month. Is that fair?"
@@ -39,7 +57,7 @@ IMPORTANT: A franchisee who does NOT push for a hard sale when someone asks for 
 "I NEED TO TALK TO MY SPOUSE":
 "Totally understand you want to talk with him/her. When you sit and talk with them, do you think it would be more about the costs or if you like this gym? So what you're feeling is that if you go home right now and pay the full enrollment, they might get mad? Did you get the coupon we sent out?"
 
-STEP 3 — LANGUAGE AND PSYCHOLOGY
+STEP 4 — LANGUAGE AND PSYCHOLOGY
 Every word either opens or closes a door. Key things to evaluate:
 - Assumptive vs. permission-seeking language ("which one would you like" vs. "would you like to join")
 - Avoiding yes/no questions at close moments
@@ -47,18 +65,11 @@ Every word either opens or closes a door. Key things to evaluate:
 - Not over-explaining after a buying signal
 - Reframing price objections toward value rather than agreeing with hesitation
 
-STEP 4 — CLOSE EXECUTION
+STEP 5 — CLOSE EXECUTION
 - Did they attempt a direct close?
-- Did they work through the discount sequence before giving up?
-- Did they use the By The Way Close before the prospect left with a pass?
-- Did they end with a sale, a signed-up pass with a return path, or a clear scheduled follow-up?
-- Did they avoid ending with "okay just let me know" or walking away with nothing?
-
-SCORING PHILOSOPHY:
-- Score the spirit and intent of the process, not word-for-word compliance. If the franchisee hit the right beats in a natural way, give full or near-full credit.
-- Do NOT penalize for steps that weren't needed. If no objection arose, score based on readiness — not on absence of a scenario.
-- A perfect or near-perfect consult should score 90-100. Reserve scores below 70 for consults where major process steps were clearly missed.
-- Do not grade the gym tour — grading starts when the prospect sits down at the desk.
+- Did they re-close after an objection?
+- Did they create urgency with a specific reason to decide today?
+- Did they stay in control of the conversation or let the prospect lead them out?
 - Pricing tiers vary by location. Do not score based on specific price points. What matters is: multiple options presented, first month + last month + enrollment collected, and any waiver was earned through the proper script sequence.
 
 SCORING:
@@ -85,6 +96,7 @@ Return ONLY valid JSON, no other text, no markdown:
 }
 
 TRANSCRIPT:
+`
 `;
 
 async function transcribeAudio(audioFilePath) {
