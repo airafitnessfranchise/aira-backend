@@ -159,49 +159,60 @@ app.get('/scorecard/:id', async (req, res) => {
     const date = new Date(r.recorded_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const scoreColor = s.total_score >= 80 ? '#c8f060' : s.total_score >= 60 ? '#f0c060' : '#ff6b6b';
     const sections = [
-      ['Rapport', s.rapport_score, s.rapport_coaching],
-      ['Presentation', s.presentation_score, s.presentation_coaching],
-      ['Objection Handling', s.objection_handling_score, s.objection_coaching],
-      ['The Close', s.close_attempt_score, s.close_coaching],
-      ['Follow Up', s.followup_score, s.followup_coaching],
+      ['Sit-Down Presentation', s.sitdown_score],
+      ['Objection Handling', s.objection_score],
+      ['Language & Delivery', s.language_score],
+      ['The Close', s.close_score],
     ];
     res.send(`<!DOCTYPE html><html><head><title>Scorecard — ${name}</title><meta charset="utf-8"><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#0a0a0a;color:#f0f0f0;padding:32px}
+body{font-family:Arial,sans-serif;background:#0a0a0a;color:#f0f0f0;padding:32px;max-width:800px;margin:0 auto}
 h1{color:#c8f060;font-size:22px;margin-bottom:4px}
 .sub{color:#666;font-size:13px;margin-bottom:32px}
 .score-big{font-size:56px;font-weight:bold;color:${scoreColor};line-height:1}
-.summary{color:#ccc;font-size:15px;margin:16px 0 32px;max-width:640px;line-height:1.6}
-.section{background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:16px;max-width:720px}
-.sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.sec-label{color:#c8f060;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px}
+.summary{color:#ccc;font-size:15px;margin:16px 0 32px;line-height:1.6}
+.scores-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px}
+.section{background:#111;border:1px solid #222;border-radius:10px;padding:16px}
+.sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sec-label{color:#c8f060;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px}
 .sec-score{color:#fff;font-size:18px;font-weight:bold}
-.bar{background:#222;border-radius:4px;height:6px;margin-bottom:14px}
+.bar{background:#222;border-radius:4px;height:6px}
 .bar-fill{height:6px;border-radius:4px;background:#c8f060}
-.coaching{color:#bbb;font-size:13px;line-height:1.7}
+.coaching-box{background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:24px}
+.coaching-box h3{color:#c8f060;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.coaching-box p{color:#bbb;font-size:13px;line-height:1.8;white-space:pre-wrap}
+.transcript-box{background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:24px}
+.transcript-box h3{color:#c8f060;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.transcript-box p{color:#888;font-size:12px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto}
 .back{display:inline-block;color:#666;font-size:12px;text-decoration:none;margin-bottom:24px}
 .back:hover{color:#c8f060}
+.flag{display:inline-block;background:#ff000022;border:1px solid #ff4444;color:#ff4444;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:bold;margin-bottom:16px}
 </style></head><body>
 <a href="/admin" class="back">← Back to Admin</a>
+${s.flagged_for_review ? '<div class="flag">⚠ Flagged for Review</div>' : ''}
 <h1>${name}</h1>
-<div class="sub">${loc.franchise_name || r.location_id} &nbsp;·&nbsp; ${date}</div>
+<div class="sub">${loc.franchise_name || r.location_id} &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; ${Math.round(r.duration_seconds/60)}m ${r.duration_seconds%60}s</div>
 <div class="score-big">${s.total_score}<span style="font-size:24px;color:#666">/100</span></div>
-<p class="summary">${s.ai_summary}</p>
-${sections.map(([label, score, coaching]) => `
+<p class="summary">${s.ai_summary || ''}</p>
+<div class="scores-grid">
+${sections.map(([label, score]) => `
 <div class="section">
   <div class="sec-header">
     <span class="sec-label">${label}</span>
-    <span class="sec-score">${score}/20</span>
+    <span class="sec-score">${score != null ? score + '/25' : '—'}</span>
   </div>
-  <div class="bar"><div class="bar-fill" style="width:${(score/20)*100}%"></div></div>
-  <div class="coaching">${coaching || '—'}</div>
+  <div class="bar"><div class="bar-fill" style="width:${score != null ? (score/25)*100 : 0}%"></div></div>
 </div>`).join('')}
+</div>
+${s.coaching_note ? `<div class="coaching-box"><h3>Coaching Notes</h3><p>${s.coaching_note}</p></div>` : ''}
+${r.transcript ? `<div class="transcript-box"><h3>Transcript</h3><p>${r.transcript}</p></div>` : ''}
 </body></html>`);
   } catch(err) {
     console.error('[Scorecard] Error:', err.message);
     res.status(500).send('Error loading scorecard: ' + err.message);
   }
 });
+
 
 app.get('/playback/:recording_id', async (req, res) => {
   const rec = await db.getRecording(req.params.recording_id);
