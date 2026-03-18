@@ -188,9 +188,6 @@ Return ONLY valid JSON — no other text, no markdown:
 }
 
 TRANSCRIPT:
-`
-`
-`
 `;
 
 async function transcribeAudio(audioFilePath) {
