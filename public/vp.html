@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aira Fitness — VP Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c26;--border:#2a2a38;--accent:#6c63ff;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--text:#e8e8f0;--muted:#6b6b80;--mono:'DM Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:18px;font-weight:700;letter-spacing:-0.5px}.logo span{color:var(--accent)}
+.badge{background:var(--accent);color:white;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;margin-left:12px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.period-selector{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 12px;border-radius:8px;cursor:pointer;outline:none}
+.refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:13px;padding:6px 14px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+.refresh-btn:hover{color:var(--text);border-color:var(--accent)}
+.main{padding:32px;max-width:1600px;margin:0 auto}
+.summary-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:32px}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden}
+.summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.summary-card.green::before{background:var(--green)}.summary-card.yellow::before{background:var(--yellow)}.summary-card.red::before{background:var(--red)}
+.summary-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+.summary-value{font-size:28px;font-weight:700;letter-spacing:-1px;font-family:var(--mono)}
+.summary-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted)}
+.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:32px}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--surface2);padding:12px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th.right{text-align:right}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+td{padding:14px 16px;font-size:13px;vertical-align:middle}
+td.right{text-align:right}
+td.mono{font-family:var(--mono);font-size:13px}
+.loc-name{font-weight:600;font-size:14px}.loc-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.score-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-family:var(--mono);font-size:13px;font-weight:500}
+.score-pill.green{background:rgba(34,197,94,0.12);color:var(--green)}
+.score-pill.yellow{background:rgba(245,158,11,0.12);color:var(--yellow)}
+.score-pill.red{background:rgba(239,68,68,0.12);color:var(--red)}
+.score-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.match-badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;font-family:var(--mono)}
+.match-ok{background:rgba(34,197,94,0.1);color:var(--green)}
+.match-warn{background:rgba(245,158,11,0.1);color:var(--yellow)}
+.match-alert{background:rgba(239,68,68,0.1);color:var(--red)}
+.match-na{background:rgba(107,107,128,0.1);color:var(--muted)}
+.score-trend{display:flex;gap:3px;align-items:flex-end}
+.trend-bar{width:5px;border-radius:2px;background:var(--border)}
+.loading-row td{text-align:center;padding:48px;color:var(--muted);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.detail-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:32px;display:none}
+.detail-panel.open{display:block}
+.detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.detail-title{font-size:18px;font-weight:700}
+.close-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px}
+.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.detail-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px}
+.detail-card-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px}
+.detail-card-value{font-size:22px;font-weight:700;font-family:var(--mono);letter-spacing:-0.5px}
+.detail-card-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.scorecard-list{display:flex;flex-direction:column;gap:10px}
+.scorecard-row{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.scorecard-info{display:flex;flex-direction:column;gap:2px}
+.scorecard-name{font-weight:600}.scorecard-date{font-size:11px;color:var(--muted)}
+.scorecard-scores{display:flex;gap:20px}
+.scorecard-cat{text-align:center}
+.scorecard-cat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+.scorecard-cat-val{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:2px}
+.auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;text-align:center}
+.auth-logo{font-size:24px;font-weight:700;margin-bottom:8px}.auth-logo span{color:var(--accent)}
+.auth-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.auth-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;padding:12px 16px;border-radius:10px;margin-bottom:14px;outline:none;transition:border-color 0.2s}
+.auth-input:focus{border-color:var(--accent)}
+.auth-btn{width:100%;background:var(--accent);color:white;border:none;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;padding:12px;border-radius:10px;cursor:pointer;transition:opacity 0.2s}
+.auth-btn:hover{opacity:0.85}
+.auth-error{color:var(--red);font-size:12px;margin-top:10px;display:none}
+@media(max-width:1200px){.summary-strip{grid-template-columns:repeat(3,1fr)}.detail-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">Aira <span>Fitness</span></div>
+    <div class="auth-sub">VP Dashboard — Authorized Access Only</div>
+    <input class="auth-input" type="password" id="authInput" placeholder="Enter VP password" />
+    <button class="auth-btn" onclick="checkAuth()">Sign In</button>
+    <div class="auth-error" id="authError">Incorrect password</div>
+  </div>
+</div>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <div class="logo">Aira <span>Fitness</span></div>
+    <div class="badge">VP Dashboard</div>
+  </div>
+  <div class="topbar-right">
+    <select class="period-selector" id="periodSelect" onchange="loadData()">
+      <option value="this_month">This Month</option>
+      <option value="last_month">Last Month</option>
+      <option value="last_7">Last 7 Days</option>
+      <option value="last_30">Last 30 Days</option>
+    </select>
+    <button class="refresh-btn" onclick="loadData()">&#8635; Refresh</button>
+  </div>
+</div>
+<div class="main">
+  <div class="summary-strip">
+    <div class="summary-card"><div class="summary-label">Total Revenue</div><div class="summary-value" id="summaryRevenue">—</div><div class="summary-sub">GymMaster actual</div></div>
+    <div class="summary-card green"><div class="summary-label">New Members</div><div class="summary-value" id="summaryNewMembers">—</div><div class="summary-sub">Across all locations</div></div>
+    <div class="summary-card"><div class="summary-label">Avg Consult Score</div><div class="summary-value" id="summaryAvgScore">—</div><div class="summary-sub">Sales scorecards</div></div>
+    <div class="summary-card yellow"><div class="summary-label">Flagged Locations</div><div class="summary-value" id="summaryFlagged">—</div><div class="summary-sub">Score &lt; 70</div></div>
+    <div class="summary-card"><div class="summary-label">Active Locations</div><div class="summary-value" id="summaryActive">—</div><div class="summary-sub">With scorecards</div></div>
+  </div>
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <div class="detail-title" id="detailTitle">Location Detail</div>
+      <button class="close-btn" onclick="closeDetail()">&#10005; Close</button>
+    </div>
+    <div class="detail-grid" id="detailGrid"></div>
+    <div class="section-header"><div class="section-title">Recent Scorecards</div></div>
+    <div class="scorecard-list" id="detailScorecards"></div>
+  </div>
+  <div class="section-header">
+    <div class="section-title">All Locations</div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:var(--green)"></span>Strong (80+)</span>
+      <span><span class="legend-dot" style="background:var(--yellow)"></span>Watch (70-79)</span>
+      <span><span class="legend-dot" style="background:var(--red)"></span>Action needed (&lt;70)</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th class="right">GM Revenue</th>
+          <th class="right">Self-Reported</th>
+          <th class="right">Match</th>
+          <th class="right">New Members</th>
+          <th class="right">Avg Score</th>
+          <th class="right">Last Score</th>
+          <th class="right">Scorecards</th>
+          <th>Trend</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr class="loading-row"><td colspan="9"><span class="spinner"></span>Loading locations...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+var VP_PASSWORD = 'aira2024vp';
+var allData = [];
+
+function checkAuth() {
+  if (document.getElementById('authInput').value === VP_PASSWORD) {
+    document.getElementById('authOverlay').style.display = 'none';
+    sessionStorage.setItem('vp_auth','1');
+    loadData();
+  } else {
+    document.getElementById('authError').style.display = 'block';
+  }
+}
+document.getElementById('authInput').addEventListener('keydown', function(e){ if(e.key==='Enter') checkAuth(); });
+if (sessionStorage.getItem('vp_auth')==='1') document.getElementById('authOverlay').style.display='none';
+
+function getPeriodDates(p) {
+  var now = new Date(), pad = function(n){return String(n).padStart(2,'0')};
+  var fmt = function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+  if (p==='this_month') return {start:fmt(new Date(now.getFullYear(),now.getMonth(),1)),end:fmt(now)};
+  if (p==='last_month') return {start:fmt(new Date(now.getFullYear(),now.getMonth()-1,1)),end:fmt(new Date(now.getFullYear(),now.getMonth(),0))};
+  var s=new Date(now); s.setDate(s.getDate()-(p==='last_7'?7:30));
+  return {start:fmt(s),end:fmt(now)};
+}
+
+function fmtDollar(n) { return n==null?'—':'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function scoreClass(s) { return s==null?'':s>=80?'green':s>=70?'yellow':'red'; }
+function revenueMatchBadge(gm,sh) {
+  if (!gm||!sh) return '<span class="match-badge match-na">N/A</span>';
+  var d=Math.abs(gm-sh)/gm;
+  return d<=0.10?'<span class="match-badge match-ok">Match</span>':d<=0.20?'<span class="match-badge match-warn">Gap</span>':'<span class="match-badge match-alert">GAP</span>';
+}
+function trendBars(scores) {
+  if (!scores||!scores.length) return '—';
+  return '<div class="score-trend">'+scores.slice(-5).map(function(s){
+    var h=Math.max(4,Math.round((s/100)*28));
+    var c=s>=80?'var(--green)':s>=70?'var(--yellow)':'var(--red)';
+    return '<div class="trend-bar" style="height:'+h+'px;background:'+c+'"></div>';
+  }).join('')+'</div>';
+}
+
+async function loadData() {
+  if (sessionStorage.getItem('vp_auth')!=='1') return;
+  var period=document.getElementById('periodSelect').value;
+  var dates=getPeriodDates(period);
+  document.getElementById('tableBody').innerHTML='<tr class="loading-row"><td colspan="9"><span class="spinner"></span>Loading data...</td></tr>';
+  try {
+    var res=await fetch('/api/vp-data?start='+dates.start+'&end='+dates.end);
+    var data=await res.json();
+    allData=data.locations||[];
+    renderTable(allData);
+    renderSummary(allData);
+  } catch(err) {
+    document.getElementById('tableBody').innerHTML='<tr class="loading-row"><td colspan="9">Error: '+err.message+'</td></tr>';
+  }
+}
+
+function renderSummary(locs) {
+  var totalRev=locs.reduce(function(s,l){return s+(l.gymmaster_revenue||0);},0);
+  var totalNew=locs.reduce(function(s,l){return s+(l.new_members||0);},0);
+  var scored=locs.filter(function(l){return l.avg_score!=null;});
+  var avg=scored.length?Math.round(scored.reduce(function(s,l){return s+l.avg_score;},0)/scored.length):null;
+  var flagged=locs.filter(function(l){return l.avg_score!=null&&l.avg_score<70;}).length;
+  var active=locs.filter(function(l){return l.scorecard_count>0;}).length;
+  document.getElementById('summaryRevenue').textContent=fmtDollar(totalRev);
+  document.getElementById('summaryNewMembers').textContent=totalNew||'—';
+  document.getElementById('summaryAvgScore').textContent=avg!=null?avg+'/100':'—';
+  document.getElementById('summaryFlagged').textContent=flagged;
+  document.getElementById('summaryActive').textContent=active+'/'+locs.length;
+}
+
+function renderTable(locs) {
+  if (!locs.length) { document.getElementById('tableBody').innerHTML='<tr class="loading-row"><td colspan="9">No locations found.</td></tr>'; return; }
+  document.getElementById('tableBody').innerHTML=locs.map(function(loc,i){
+    var sc=scoreClass(loc.avg_score), lsc=scoreClass(loc.last_score);
+    return '<tr onclick="openDetail('+i+')">'
+      +'<td><div class="loc-name">'+loc.franchise_name+'</div><div class="loc-sub">'+loc.location_id+'</div></td>'
+      +'<td class="right mono">'+fmtDollar(loc.gymmaster_revenue)+'</td>'
+      +'<td class="right mono">'+fmtDollar(loc.sheet_revenue)+'</td>'
+      +'<td class="right">'+revenueMatchBadge(loc.gymmaster_revenue,loc.sheet_revenue)+'</td>'
+      +'<td class="right mono">'+(loc.new_members!=null?loc.new_members:'—')+'</td>'
+      +'<td class="right">'+(loc.avg_score!=null?'<span class="score-pill '+sc+'"><span class="score-dot"></span>'+loc.avg_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td class="right">'+(loc.last_score!=null?'<span class="score-pill '+lsc+'"><span class="score-dot"></span>'+loc.last_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td class="right mono" style="color:var(--muted)">'+(loc.scorecard_count||0)+'</td>'
+      +'<td>'+trendBars(loc.score_history)+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function openDetail(i) {
+  var loc=allData[i]; if(!loc) return;
+  document.getElementById('detailTitle').textContent=loc.franchise_name;
+  document.getElementById('detailGrid').innerHTML=
+    '<div class="detail-card"><div class="detail-card-label">GM Revenue</div><div class="detail-card-value">'+fmtDollar(loc.gymmaster_revenue)+'</div><div class="detail-card-sub">GymMaster actual</div></div>'
+    +'<div class="detail-card"><div class="detail-card-label">Self-Reported</div><div class="detail-card-value">'+fmtDollar(loc.sheet_revenue)+'</div><div class="detail-card-sub">Google Sheet</div></div>'
+    +'<div class="detail-card"><div class="detail-card-label">Avg Score</div><div class="detail-card-value" style="color:var(--'+(scoreClass(loc.avg_score)||'text')+')">'+(loc.avg_score!=null?loc.avg_score+'/100':'—')+'</div><div class="detail-card-sub">'+loc.scorecard_count+' scorecards</div></div>'
+    +'<div class="detail-card"><div class="detail-card-label">New Members</div><div class="detail-card-value">'+(loc.new_members!=null?loc.new_members:'—')+'</div><div class="detail-card-sub">This period</div></div>';
+  var scs=loc.recent_scorecards||[];
+  document.getElementById('detailScorecards').innerHTML=scs.length?scs.map(function(s){
+    return '<div class="scorecard-row">'
+      +'<div class="scorecard-info"><div class="scorecard-name">'+(s.prospect_name||'Walk-in')+'</div><div class="scorecard-date">'+new Date(s.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</div></div>'
+      +'<div class="scorecard-scores">'
+      +[['Sit-Down',s.sitdown_score,25],['Objections',s.objection_score,25],['Language',s.language_score,25],['Close',s.close_score,25]].map(function(c){
+        return '<div class="scorecard-cat"><div class="scorecard-cat-label">'+c[0]+'</div><div class="scorecard-cat-val" style="color:var(--'+(scoreClass(c[1]/(c[2]/100))||'text')+')">'+(c[1]!=null?c[1]:'—')+'</div></div>';
+      }).join('')+'</div>'
+      +'<span class="score-pill '+scoreClass(s.total_score)+'"><span class="score-dot"></span>'+s.total_score+'</span>'
+      +'</div>';
+  }).join(''):'<div style="color:var(--muted);font-size:13px;padding:12px">No scorecards yet.</div>';
+  document.getElementById('detailPanel').classList.add('open');
+  document.getElementById('detailPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function closeDetail() { document.getElementById('detailPanel').classList.remove('open'); }
+if (sessionStorage.getItem('vp_auth')==='1') loadData();
+</script>
+</body>
+</html>
