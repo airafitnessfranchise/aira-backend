@@ -12,12 +12,14 @@ const { initDb, ...db } = require('./db');
 const { transcribeAudio, scoreTranscript } = require('./ai');
 const { sendScorecardEmail } = require('./email');
 const { uploadToR2, getPresignedUrl } = require('./storage');
+const vpRoutes = require('./vp-routes');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
+app.use(vpRoutes);
 app.use(express.static('public'));
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
