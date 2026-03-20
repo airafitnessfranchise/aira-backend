@@ -1,4 +1,11 @@
 // sheets.js
+// Reads franchisee Google Sheets via public gviz endpoint
+// Status column (I, index 8) drives all metrics:
+//   "Sold" = close
+//   "No Show" = no show  
+//   "Booked appt" = appointment booked
+//   $ Collected (H, index 7) = revenue if filled in
+
 const https = require('https');
 
 function fetchSheetData(sheetId, tabName) {
@@ -25,23 +32,42 @@ async function getSheetMetrics(sheetId, tabName) {
   try {
     const data = await fetchSheetData(sheetId, tabName);
     if (data.status !== 'ok' || !data.table) throw new Error('Bad status: ' + data.status);
+
+    // Skip first row (header), filter to rows with a name in col A
     const rows = (data.table.rows || []).slice(1).filter(row => row.c && row.c[0] && row.c[0].v);
-    let totalLeads = 0, totalShows = 0, totalCloses = 0, totalRevenue = 0;
+
+    let totalLeads = 0, totalShows = 0, totalCloses = 0, totalRevenue = 0, totalBooked = 0;
+
     for (const row of rows) {
       const cells = row.c || [];
       if (!cells[0] || !cells[0].v) continue;
       totalLeads++;
-      const show = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
-      if (show === 'yes') totalShows++;
-      const dollars = cells[7] && cells[7].v != null ? Number(cells[7].v) : 0;
+
+      // Status is col I (index 8)
       const status = cells[8] && cells[8].v ? String(cells[8].v).trim().toLowerCase() : '';
-      if (dollars > 0) { totalRevenue += dollars; totalCloses++; }
-      else if (status === 'sold') { totalCloses++; }
+      // $ Collected is col H (index 7)
+      const dollars = cells[7] && cells[7].v != null ? Number(cells[7].v) : 0;
+      // Show col F (index 5)
+      const show = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
+
+      if (status === 'sold') {
+        totalCloses++;
+        if (dollars > 0) totalRevenue += dollars;
+      }
+      if (status === 'no show') totalShows++;  // no show = did NOT show
+      if (status === 'booked appt') totalBooked++;
+      if (show === 'yes') totalShows++;
+      if (dollars > 0 && status !== 'sold') totalRevenue += dollars;
     }
+
+    // Shows = total leads minus no-shows and not-contacted
+    const actualShows = totalLeads - totalShows;
+
     return {
       totalLeads,
-      totalShows,
-      showRate: totalLeads > 0 ? Math.round((totalShows / totalLeads) * 100) : 0,
+      totalBooked,
+      totalShows: actualShows > 0 ? actualShows : 0,
+      showRate: totalLeads > 0 ? Math.round((actualShows / totalLeads) * 100) : 0,
       totalCloses,
       closeRate: totalLeads > 0 ? Math.round((totalCloses / totalLeads) * 100) : 0,
       totalRevenue: Math.round(totalRevenue),
