@@ -1,7 +1,9 @@
 // sheets.js
 // Reads franchisee appt tracker sheets via gviz endpoint
-// Summary row pattern: col A empty, col I = total signup fees, col J = avg per close
-// Data rows: col A = name, col E = status, col F = Sale?(Yes/No), col H = signup fee
+// Summary rows (found by label in col A):
+//   "Gross Revenue" row -> col D (index 3) = gross revenue
+//   "Avg $ Per Sale" row -> col D (index 3) = avg per close
+// Data rows: col A=name, col E=status, col F=Sale?(Yes/No)
 
 const https = require('https');
 
@@ -33,40 +35,31 @@ async function getSheetMetrics(sheetId, tabName) {
     const rows = data.table.rows || [];
     if (rows.length < 2) return null;
 
-    // Validate this is appt tracker format: row 1 col 1 = "APT"
+    // Validate: row 1 col 1 = "APT" means this is the appt tracker tab
     const row1 = rows[1];
     const isApptTracker = row1 && row1.c && row1.c[1] && row1.c[1].v === 'APT';
     if (!isApptTracker) return null;
 
-    // Find the summary row: col A empty, col I (8) has a large number (total signup fees)
-    let totalSignupFees = null, avgPerClose = null, summaryRowIdx = -1;
-    rows.forEach((r, i) => {
-      const cells = r.c || [];
-      const colA = cells[0] && cells[0].v;
-      const colI = cells[8] && cells[8].v != null ? Number(cells[8].v) : 0;
-      const colJ = cells[9] && cells[9].v != null ? Number(cells[9].v) : 0;
-      if (!colA && colI > 500) {
-        // This is the summary row
-        if (totalSignupFees === null || colI > totalSignupFees) {
-          totalSignupFees = colI;
-          avgPerClose = colJ > 0 ? Math.round(colJ) : null;
-          summaryRowIdx = i;
-        }
-      }
-    });
-
-    // Count leads, shows, closes from data rows (skip title row 0 and header row 1)
-    const dataRows = rows.slice(2).filter(r => r.c && r.c[0] && r.c[0].v);
+    let grossRevenue = null, avgPerClose = null;
     let totalLeads = 0, totalShows = 0, totalCloses = 0;
 
-    for (const row of dataRows) {
-      const cells = row.c || [];
-      if (!cells[0] || !cells[0].v) continue;
-      totalLeads++;
-      const status = cells[4] && cells[4].v ? String(cells[4].v).trim().toLowerCase() : '';
-      const sale = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
-      if (status.includes('show') && !status.includes('no show')) totalShows++;
-      if (sale === 'yes') totalCloses++;
+    for (let i = 0; i < rows.length; i++) {
+      const cells = rows[i].c || [];
+      const colA = cells[0] && cells[0].v != null ? String(cells[0].v).trim() : '';
+      const colD = cells[3] && cells[3].v != null ? Number(cells[3].v) : null;
+
+      // Find summary rows by label
+      if (colA === 'Gross Revenue' && colD) grossRevenue = colD;
+      if (colA === 'Avg $ Per Sale' && colD) avgPerClose = Math.round(colD);
+
+      // Count data rows (rows 2+ with a name in col A)
+      if (i >= 2 && colA && colA.length > 1 && isNaN(Number(colA))) {
+        const colE = cells[4] && cells[4].v ? String(cells[4].v).trim().toLowerCase() : '';
+        const colF = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
+        totalLeads++;
+        if (colE.includes('show') && !colE.includes('no show')) totalShows++;
+        if (colF === 'yes') totalCloses++;
+      }
     }
 
     return {
@@ -75,8 +68,8 @@ async function getSheetMetrics(sheetId, tabName) {
       showRate: totalLeads > 0 ? Math.round((totalShows / totalLeads) * 100) : 0,
       totalCloses,
       closeRate: totalLeads > 0 ? Math.round((totalCloses / totalLeads) * 100) : 0,
-      totalRevenue: totalSignupFees !== null ? Math.round(totalSignupFees) : 0,
-      avgPerClose: avgPerClose || (totalCloses > 0 && totalSignupFees ? Math.round(totalSignupFees / totalCloses) : 0)
+      totalRevenue: grossRevenue !== null ? Math.round(grossRevenue) : 0,
+      avgPerClose: avgPerClose || (totalCloses > 0 && grossRevenue ? Math.round(grossRevenue / totalCloses) : 0)
     };
   } catch(err) {
     console.error('[Sheets] Error for ' + sheetId + ':', err.message);
