@@ -1,93 +1,58 @@
-// sheets.js
 const https = require('https');
 
-function fetchSheetData(sheetId, tabName, callback) {
-  const url = 'https://docs.google.com/spreadsheets/d/' + sheetId + '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(tabName);
+function fetchSheet(id, tab, cb) {
+  const url = 'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(tab);
   https.get(url, function(res) {
-    let data = '';
-    res.on('data', function(chunk) { data += chunk; });
+    let d = '';
+    res.on('data', function(c) { d += c; });
     res.on('end', function() {
-      try {
-        const start = data.indexOf('(') + 1;
-        const end = data.lastIndexOf(')');
-        callback(null, JSON.parse(data.substring(start, end)));
-      } catch(e) { callback(e); }
+      try { cb(null, JSON.parse(d.substring(d.indexOf('(') + 1, d.lastIndexOf(')'))));
+      } catch(e) { cb(e); }
     });
-  }).on('error', callback);
+  }).on('error', cb);
 }
 
 function getSheetMetrics(sheetId, tabName) {
   return new Promise(function(resolve) {
-    fetchSheetData(sheetId, tabName, function(err, data) {
-      if (err || !data || data.status !== 'ok' || !data.table) return resolve(null);
+    fetchSheet(sheetId, tabName, function(err, data) {
+      if (err || !data || data.status !== 'ok' || !data.table) { resolve(null); return; }
       const rows = data.table.rows || [];
-      if (rows.length < 2) return resolve(null);
-      const row1 = rows[1];
-      if (!row1 || !row1.c || !row1.c[1] || row1.c[1].v !== 'APT') return resolve(null);
-
-      let grossRevenue = null, avgPerClose = null;
-      let totalLeads = 0, totalShows = 0, totalCloses = 0;
-
+      if (rows.length < 2) { resolve(null); return; }
+      const r1 = rows[1];
+      if (!r1 || !r1.c || !r1.c[1] || r1.c[1].v !== 'APT') { resolve(null); return; }
+      let grossRev = null, avgClose = null, leads = 0, shows = 0, closes = 0;
       for (let i = 0; i < rows.length; i++) {
-        const cells = rows[i].c || [];
-        const colA = cells[0] && cells[0].v != null ? String(cells[0].v).trim() : '';
-        const colD = cells[3] && cells[3].v != null ? Number(cells[3].v) : null;
-        if (colA === 'Gross Revenue' && colD) grossRevenue = colD;
-        if (colA === 'Avg $ Per Sale' && colD) avgPerClose = Math.round(colD);
-        if (i >= 2 && colA && colA.length > 1 && isNaN(Number(colA))) {
-          const colE = cells[4] && cells[4].v ? String(cells[4].v).trim().toLowerCase() : '';
-          const colF = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
-          totalLeads++;
-          if (colE.indexOf('show') >= 0 && colE.indexOf('no show') < 0) totalShows++;
-          if (colF === 'yes') totalCloses++;
+        const c = rows[i].c || [];
+        const a = c[0] && c[0].v != null ? String(c[0].v).trim() : '';
+        const dv = c[3] && c[3].v != null ? Number(c[3].v) : null;
+        if (a === 'Gross Revenue' && dv) { grossRev = dv; }
+        if (a === 'Avg $ Per Sale' && dv) { avgClose = Math.round(dv); }
+        if (i >= 2 && a && a.length > 1 && isNaN(Number(a))) {
+          const ev = c[4] && c[4].v ? String(c[4].v).trim().toLowerCase() : '';
+          const fv = c[5] && c[5].v ? String(c[5].v).trim().toLowerCase() : '';
+          leads++;
+          if (ev.indexOf('show') >= 0 && ev.indexOf('no show') < 0) { shows++; }
+          if (fv === 'yes') { closes++; }
         }
       }
-
-      resolve({
-        totalLeads: totalLeads,
-        totalShows: totalShows,
-        showRate: totalLeads > 0 ? Math.round((totalShows / totalLeads) * 100) : 0,
-        totalCloses: totalCloses,
-        closeRate: totalLeads > 0 ? Math.round((totalCloses / totalLeads) * 100) : 0,
-        totalRevenue: grossRevenue !== null ? Math.round(grossRevenue) : 0,
-        avgPerClose: avgPerClose || (totalCloses > 0 && grossRevenue ? Math.round(grossRevenue / totalCloses) : 0)
-      });
+      resolve({ totalLeads: leads, totalShows: shows, showRate: leads > 0 ? Math.round(shows / leads * 100) : 0, totalCloses: closes, closeRate: leads > 0 ? Math.round(closes / leads * 100) : 0, totalRevenue: grossRev ? Math.round(grossRev) : 0, avgPerClose: avgClose || 0 });
     });
   });
 }
 
 function getAllSheetMetrics(locations) {
-  const now = new Date();
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const monthTab = 'appt tracker -' + months[now.getMonth()] + ' ' + now.getFullYear();
-
-  const promises = locations
-    .filter(function(loc) { return loc.google_sheet_id; })
-    .map(function(loc) {
-      return getSheetMetrics(loc.google_sheet_id, monthTab)
-        .then(function(metrics) {
-          if (!metrics) return getSheetMetrics(loc.google_sheet_id, loc.sheet_tab || 'appt tracker');
-          return metrics;
-        })
-        .then(function(metrics) {
-          const result = { location_id: loc.location_id };
-          if (metrics) {
-            result.totalLeads = metrics.totalLeads;
-            result.totalShows = metrics.totalShows;
-            result.showRate = metrics.showRate;
-            result.totalCloses = metrics.totalCloses;
-            result.closeRate = metrics.closeRate;
-            result.totalRevenue = metrics.totalRevenue;
-            result.avgPerClose = metrics.avgPerClose;
-          }
-          return result;
-        });
-    });
-
-  return Promise.all(promises).then(function(results) {
-    const byLocationId = {};
-    results.forEach(function(r) { byLocationId[r.location_id] = r; });
-    return byLocationId;
+  const now = new Date();
+  const tab = 'appt tracker -' + months[now.getMonth()] + ' ' + now.getFullYear();
+  const locs = locations.filter(function(l) { return l.google_sheet_id; });
+  return Promise.all(locs.map(function(loc) {
+    return getSheetMetrics(loc.google_sheet_id, tab)
+      .then(function(m) { return m || getSheetMetrics(loc.google_sheet_id, 'appt tracker'); })
+      .then(function(m) { if (m) { m.location_id = loc.location_id; } return m || { location_id: loc.location_id }; });
+  })).then(function(res) {
+    const out = {};
+    res.forEach(function(r) { out[r.location_id] = r; });
+    return out;
   });
 }
 
