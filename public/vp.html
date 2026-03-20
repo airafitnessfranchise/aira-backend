@@ -232,13 +232,13 @@ function renderTable(locs) {
     var sc=scoreClass(loc.avg_score), lsc=scoreClass(loc.last_score);
     return '<tr onclick="openDetail('+i+')">'
       +'<td><div class="loc-name">'+loc.franchise_name+'</div><div class="loc-sub">'+loc.location_id+'</div></td>'
-      +'<td class="right mono">'+fmtDollar(loc.gymmaster_revenue)+'</td>'
-      +'<td class="right mono">'+fmtDollar(loc.sheet_revenue)+'</td>'
-      +'<td class="right">'+revenueMatchBadge(loc.gymmaster_revenue,loc.sheet_revenue)+'</td>'
-      +'<td class="right mono">'+(loc.new_members!=null?loc.new_members:'—')+'</td>'
+      +'<td class="right mono">'+(loc.total_leads!=null?loc.total_leads:'—')+'</td>'
+      +'<td class="right">'+(loc.total_shows!=null?loc.total_shows+' <span style="color:var(--muted);font-size:11px;">('+loc.show_rate+'%)</span>':'—')+'</td>'
+      +'<td class="right mono">'+(loc.total_closes!=null?loc.total_closes:'—')+'</td>'
+      +'<td class="right">'+(loc.close_rate!=null?'<span class="score-pill '+(loc.close_rate>=40?'green':loc.close_rate>=25?'yellow':'red')+'"><span class="score-dot"></span>'+loc.close_rate+'%</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
+      +'<td class="right mono">'+(loc.avg_per_close?fmtDollar(loc.avg_per_close):'—')+'</td>'
       +'<td class="right">'+(loc.avg_score!=null?'<span class="score-pill '+sc+'"><span class="score-dot"></span>'+loc.avg_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td class="right">'+(loc.last_score!=null?'<span class="score-pill '+lsc+'"><span class="score-dot"></span>'+loc.last_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
-      +'<td class="right mono" style="color:var(--muted)">'+(loc.scorecard_count||0)+'</td>'
       +'<td>'+trendBars(loc.score_history)+'</td>'
       +'</tr>';
   }).join('');
