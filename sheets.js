@@ -12,6 +12,12 @@ function fetchSheet(id, tab, cb) {
   }).on('error', cb);
 }
 
+function parseMoney(val) {
+  if (val == null) return null;
+  const n = Number(String(val).replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
 function getSheetMetrics(sheetId, tabName) {
   return new Promise(function(resolve) {
     fetchSheet(sheetId, tabName, function(err, data) {
@@ -24,7 +30,7 @@ function getSheetMetrics(sheetId, tabName) {
       for (let i = 0; i < rows.length; i++) {
         const c = rows[i].c || [];
         const a = c[0] && c[0].v != null ? String(c[0].v).trim() : '';
-        const dv = c[3] && c[3].v != null ? Number(c[3].v) : null;
+        const dv = parseMoney(c[3] ? c[3].v : null);
         if (a === 'Gross Revenue' && dv) { grossRev = dv; }
         if (a === 'Avg $ Per Sale' && dv) { avgClose = Math.round(dv); }
         if (i >= 2 && a && a.length > 1 && isNaN(Number(a))) {
