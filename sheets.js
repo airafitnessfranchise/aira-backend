@@ -1,11 +1,7 @@
 // sheets.js
-// Reads franchisee Google Sheets via public gviz endpoint
-// appt tracker tab column mapping:
-//   A (0) = Client Name
-//   E (4) = Status: "show", "Cancelled", "Rescheduled", "No Show"
-//   F (5) = Sale? "Yes" / "No"
-//   G (6) = Monthly fee
-//   H (7) = Sign up fee  <-- tracked
+// Reads franchisee appt tracker sheets via gviz endpoint
+// Summary row pattern: col A empty, col I = total signup fees, col J = avg per close
+// Data rows: col A = name, col E = status, col F = Sale?(Yes/No), col H = signup fee
 
 const https = require('https');
 
@@ -34,40 +30,43 @@ async function getSheetMetrics(sheetId, tabName) {
     const data = await fetchSheetData(sheetId, tabName);
     if (data.status !== 'ok' || !data.table) throw new Error('Bad status: ' + data.status);
 
-    // Detect which tab format we're reading by checking row 1 headers
     const rows = data.table.rows || [];
     if (rows.length < 2) return null;
 
-    // Check if this is appt-tracker format: row 1 col 1 = "APT"
+    // Validate this is appt tracker format: row 1 col 1 = "APT"
     const row1 = rows[1];
     const isApptTracker = row1 && row1.c && row1.c[1] && row1.c[1].v === 'APT';
+    if (!isApptTracker) return null;
 
-    if (!isApptTracker) {
-      console.log('[Sheets] Tab ' + tabName + ' is not appt tracker format, skipping');
-      return null;
-    }
+    // Find the summary row: col A empty, col I (8) has a large number (total signup fees)
+    let totalSignupFees = null, avgPerClose = null, summaryRowIdx = -1;
+    rows.forEach((r, i) => {
+      const cells = r.c || [];
+      const colA = cells[0] && cells[0].v;
+      const colI = cells[8] && cells[8].v != null ? Number(cells[8].v) : 0;
+      const colJ = cells[9] && cells[9].v != null ? Number(cells[9].v) : 0;
+      if (!colA && colI > 500) {
+        // This is the summary row
+        if (totalSignupFees === null || colI > totalSignupFees) {
+          totalSignupFees = colI;
+          avgPerClose = colJ > 0 ? Math.round(colJ) : null;
+          summaryRowIdx = i;
+        }
+      }
+    });
 
-    // Skip rows 0 (title) and 1 (header)
-    const dataRows = rows.slice(2).filter(row => row.c && row.c[0] && row.c[0].v);
-
-    let totalLeads = 0, totalShows = 0, totalCloses = 0, totalSignupFees = 0;
+    // Count leads, shows, closes from data rows (skip title row 0 and header row 1)
+    const dataRows = rows.slice(2).filter(r => r.c && r.c[0] && r.c[0].v);
+    let totalLeads = 0, totalShows = 0, totalCloses = 0;
 
     for (const row of dataRows) {
       const cells = row.c || [];
       if (!cells[0] || !cells[0].v) continue;
       totalLeads++;
-
       const status = cells[4] && cells[4].v ? String(cells[4].v).trim().toLowerCase() : '';
       const sale = cells[5] && cells[5].v ? String(cells[5].v).trim().toLowerCase() : '';
-      const signupFee = cells[7] && cells[7].v != null ? Number(cells[7].v) : 0;
-
-      if (status.includes('show') && !status.includes('no show') && !status.includes('noshow')) {
-        totalShows++;
-      }
-      if (sale === 'yes') {
-        totalCloses++;
-        if (signupFee > 0) totalSignupFees += signupFee;
-      }
+      if (status.includes('show') && !status.includes('no show')) totalShows++;
+      if (sale === 'yes') totalCloses++;
     }
 
     return {
@@ -76,8 +75,8 @@ async function getSheetMetrics(sheetId, tabName) {
       showRate: totalLeads > 0 ? Math.round((totalShows / totalLeads) * 100) : 0,
       totalCloses,
       closeRate: totalLeads > 0 ? Math.round((totalCloses / totalLeads) * 100) : 0,
-      totalRevenue: Math.round(totalSignupFees),
-      avgPerClose: totalCloses > 0 ? Math.round(totalSignupFees / totalCloses) : 0
+      totalRevenue: totalSignupFees !== null ? Math.round(totalSignupFees) : 0,
+      avgPerClose: avgPerClose || (totalCloses > 0 && totalSignupFees ? Math.round(totalSignupFees / totalCloses) : 0)
     };
   } catch(err) {
     console.error('[Sheets] Error for ' + sheetId + ':', err.message);
@@ -93,16 +92,11 @@ async function getAllSheetMetrics(locations) {
 
   const results = await Promise.all(
     locations.filter(loc => loc.google_sheet_id).map(async loc => {
-      // Try month-specific tab first (e.g. "appt tracker -March 2026")
       let metrics = await getSheetMetrics(loc.google_sheet_id, monthTab);
-      // Fallback to generic name
-      if (!metrics) {
-        metrics = await getSheetMetrics(loc.google_sheet_id, loc.sheet_tab || 'appt tracker');
-      }
+      if (!metrics) metrics = await getSheetMetrics(loc.google_sheet_id, loc.sheet_tab || 'appt tracker');
       return { location_id: loc.location_id, ...(metrics || {}) };
     })
   );
-
   const byLocationId = {};
   results.forEach(r => { byLocationId[r.location_id] = r; });
   return byLocationId;
