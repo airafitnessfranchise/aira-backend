@@ -95,6 +95,7 @@ async function getScorecardsForPeriod(start, end) {
     if (byLocation[row.location_id].recent.length < 5) {
       byLocation[row.location_id].recent.push({
         prospect_name: row.contact_name || 'Walk-in',
+          recording_id: row.recording_id,
         total_score: row.total_score,
         sitdown_score: row.sitdown_score,
         objection_score: row.objection_score,
