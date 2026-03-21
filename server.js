@@ -40,10 +40,10 @@ wss.on('connection', (ws, req) => {
     try {
       const msg = JSON.parse(data);
       if (msg.type === 'register') {
-        const loc = byLocationId[msg.location_id];
+        const loc = byLocationId[(msg.location_id || '').toLowerCase()];
         if (!loc) { ws.send(JSON.stringify({ type: 'error', message: 'Unknown location: ' + msg.location_id })); return; }
-        registeredLocationId = msg.location_id;
-        tabletConnections.set(msg.location_id, ws);
+        registeredLocationId = (msg.location_id || '').toLowerCase();
+        tabletConnections.set((msg.location_id || '').toLowerCase(), ws);
         ws.send(JSON.stringify({ type: 'registered', status: 'ok', location: loc.franchise_name, message: 'Registered as ' + loc.franchise_name }));
         console.log('[WS] Tablet registered: ' + msg.location_id);
       }
@@ -80,7 +80,7 @@ app.post('/webhook/ghl', async (req, res) => {
 app.post('/upload/recording', upload.single('audio_file'), async (req, res) => {
   console.log('[Upload] Audio file received');
   const appointment_id = req.body.appointment_id;
-  const location_id = req.body.location_id;
+  const location_id = (req.body.location_id || '').toLowerCase();
   const duration_seconds = req.body.duration_seconds;
   const contact_name = req.body.contact_name;
   const file = req.file;
