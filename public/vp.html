@@ -245,7 +245,7 @@ function renderTable(locs) {
       +'<td class="right mono">'+(loc.total_closes!=null?loc.total_closes:'—')+'</td>'
       +'<td class="right">'+(loc.close_rate!=null?'<span class="score-pill '+cr+'"><span class="score-dot"></span>'+loc.close_rate+'%</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td class="right mono">'+(loc.avg_per_close?fmtDollar(loc.avg_per_close):'—')+'</td>'
-      +'<td class="right mono">'+(loc.total_revenue?fmtDollar(loc.total_revenue):'—')+'</td>'
+      +'<td class="right mono">'+(loc.sheet_revenue?fmtDollar(loc.sheet_revenue):'—')+'</td>'
       +'<td class="right">'+(loc.avg_score!=null?'<span class="score-pill '+sc+'"><span class="score-dot"></span>'+loc.avg_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td class="right">'+(loc.last_score!=null?'<span class="score-pill '+lsc+'"><span class="score-dot"></span>'+loc.last_score+'</span>':'<span style="color:var(--muted)">—</span>')+'</td>'
       +'<td>'+trendBars(loc.score_history)+'</td>'
@@ -260,7 +260,7 @@ function openDetail(i) {
     '<div class="detail-card"><div class="detail-card-label">Total Leads</div><div class="detail-card-value">'+(loc.total_leads||'—')+'</div><div class="detail-card-sub">This period</div></div>'
     +'<div class="detail-card"><div class="detail-card-label">Shows</div><div class="detail-card-value">'+(loc.total_shows!=null?loc.total_shows:'—')+'</div><div class="detail-card-sub">'+(loc.show_rate!=null?loc.show_rate+'% show rate':'')+'</div></div>'
     +'<div class="detail-card"><div class="detail-card-label">Closes</div><div class="detail-card-value">'+(loc.total_closes!=null?loc.total_closes:'—')+'</div><div class="detail-card-sub">'+(loc.close_rate!=null?loc.close_rate+'% close rate':'')+'</div></div>'
-    +'<div class="detail-card"><div class="detail-card-label">Sign-Up Fees</div><div class="detail-card-value">'+(loc.total_revenue?fmtDollar(loc.total_revenue):'—')+'</div><div class="detail-card-sub">'+(loc.avg_per_close?fmtDollar(loc.avg_per_close)+' avg per close':'')+'</div></div>'
+    +'<div class="detail-card"><div class="detail-card-label">Sign-Up Fees</div><div class="detail-card-value">'+(loc.sheet_revenue?fmtDollar(loc.sheet_revenue):'—')+'</div><div class="detail-card-sub">'+(loc.avg_per_close?fmtDollar(loc.avg_per_close)+' avg per close':'')+'</div></div>'
     +'<div class="detail-card"><div class="detail-card-label">Avg Score</div><div class="detail-card-value" style="color:var(--'+(scoreClass(loc.avg_score)||'text')+')">'+(loc.avg_score!=null?loc.avg_score+'/100':'—')+'</div><div class="detail-card-sub">'+loc.scorecard_count+' scorecards</div></div>';
   var scs = loc.recent_scorecards||[];
   document.getElementById('detailScorecards').innerHTML = scs.length ? scs.map(function(s){
