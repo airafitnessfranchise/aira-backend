@@ -76,7 +76,7 @@ router.get('/api/vp-data', async (req, res) => {
 
 async function getScorecardsForPeriod(start, end) {
   const { rows } = await pool.query(`
-    SELECT r.location_id, r.contact_name, sc.scorecard_id,
+    SELECT r.location_id, r.contact_name, sc.scorecard_id, sc.recording_id,
            sc.total_score, sc.sitdown_score, sc.objection_score,
            sc.language_score, sc.close_score, sc.created_at
     FROM scorecards sc
