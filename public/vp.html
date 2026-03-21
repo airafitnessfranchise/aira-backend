@@ -271,6 +271,7 @@ function openDetail(i) {
         return '<div class="scorecard-cat"><div class="scorecard-cat-label">'+c[0]+'</div><div class="scorecard-cat-val" style="color:var(--'+(scoreClass(c[1]/(c[2]/100))||'text')+')">'+(c[1]!=null?c[1]:'—')+'</div></div>';
       }).join('')+'</div>'
       +'<span class="score-pill '+scoreClass(s.total_score)+'"><span class="score-dot"></span>'+s.total_score+'</span>'
+      +(s.recording_id ? '<a href="/scorecard/'+s.recording_id+'" target="_blank" style="background:none;border:1px solid #6c63ff;color:#6c63ff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;margin-left:8px;">View →</a>' : '')
       +'</div>';
   }).join('') : '<div style="color:var(--muted);font-size:13px;padding:12px">No scorecards yet.</div>';
   document.getElementById('detailPanel').classList.add('open');
