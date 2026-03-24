@@ -132,7 +132,7 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
 </body></html>`;
 
   const franchiseeEmail = (location.franchisee_email || '').trim() || MIKE_EMAIL;
-  const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL, location.vp_email].filter(email => email))];
+  const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL, location.vp_email, location.club_email].filter(email => email))];
 
   console.log('[Email] Attempting send to:', recipients.join(', '), '| from:', process.env.EMAIL_FROM || 'onboarding@resend.dev');
 
