@@ -35,6 +35,21 @@ async function initDb() {
       ai_summary      TEXT DEFAULT '',
       coaching_note   TEXT DEFAULT '',
       flagged_for_review BOOLEAN DEFAULT FALSE,
+      did_close       BOOLEAN DEFAULT FALSE,
+      sitdown_what_said    TEXT DEFAULT '',
+      sitdown_what_to_say  TEXT DEFAULT '',
+      sitdown_coaching     TEXT DEFAULT '',
+      objection_what_said    TEXT DEFAULT '',
+      objection_what_to_say  TEXT DEFAULT '',
+      objection_coaching     TEXT DEFAULT '',
+      language_what_said    TEXT DEFAULT '',
+      language_what_to_say  TEXT DEFAULT '',
+      language_coaching     TEXT DEFAULT '',
+      close_what_said    TEXT DEFAULT '',
+      close_what_to_say  TEXT DEFAULT '',
+      close_coaching     TEXT DEFAULT '',
+      process_warning   TEXT DEFAULT '',
+      overall_coaching  TEXT DEFAULT '',
       created_at      TIMESTAMPTZ DEFAULT NOW()
     )
   `);
@@ -85,12 +100,37 @@ async function createScorecard({ recording_id, scorecard }) {
   const scorecard_id = uuidv4();
   const flagged = (sc.total_score || 0) < (parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70);
   await pool.query(
-    `INSERT INTO scorecards (scorecard_id, recording_id, total_score, sitdown_score, objection_score, language_score, close_score, ai_summary, coaching_note, flagged_for_review)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [scorecard_id, recording_id, sc.total_score || 0, sc.sitdown_score || 0, sc.objection_score || 0,
-     sc.language_score || 0, sc.close_score || 0, sc.ai_summary || '', sc.coaching_note || '', flagged]
+    `INSERT INTO scorecards (
+      scorecard_id, recording_id,
+      total_score, sitdown_score, objection_score, language_score, close_score,
+      ai_summary, coaching_note, flagged_for_review, did_close,
+      sitdown_what_said, sitdown_what_to_say, sitdown_coaching,
+      objection_what_said, objection_what_to_say, objection_coaching,
+      language_what_said, language_what_to_say, language_coaching,
+      close_what_said, close_what_to_say, close_coaching,
+      process_warning, overall_coaching
+    ) VALUES (
+      $1, $2,
+      $3, $4, $5, $6, $7,
+      $8, $9, $10, $11,
+      $12, $13, $14,
+      $15, $16, $17,
+      $18, $19, $20,
+      $21, $22, $23,
+      $24, $25
+    )`,
+    [
+      scorecard_id, recording_id,
+      sc.total_score || 0, sc.sitdown_score || 0, sc.objection_score || 0, sc.language_score || 0, sc.close_score || 0,
+      sc.ai_summary || '', sc.coaching_note || sc.overall_coaching || '', flagged, sc.did_close === true,
+      sc.sitdown_what_said || '', sc.sitdown_what_to_say || '', sc.sitdown_coaching || '',
+      sc.objection_what_said || '', sc.objection_what_to_say || '', sc.objection_coaching || '',
+      sc.language_what_said || '', sc.language_what_to_say || '', sc.language_coaching || '',
+      sc.close_what_said || '', sc.close_what_to_say || '', sc.close_coaching || '',
+      sc.process_warning || '', sc.overall_coaching || ''
+    ]
   );
-  console.log('[DB] Created scorecard ' + scorecard_id + ' score: ' + (sc.total_score || 0));
+  console.log('[DB] Created scorecard ' + scorecard_id + ' score: ' + (sc.total_score || 0) + ' closed: ' + (sc.did_close === true));
   return getScorecardByRecording(recording_id);
 }
 
