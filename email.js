@@ -3,21 +3,44 @@ const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 const MIKE_EMAIL = process.env.MIKE_EMAIL || 'mikebell@airafitness.com';
 
-function scoreRowHtml(label, score, max) {
+// Renders one score row: label, score/25, progress bar, and the 1-2 sentence explainer.
+function scoreRowHtml(label, score, max, explainer) {
   const pct = Math.round((score / max) * 100);
-  const color = pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const color = pct >= 90 ? '#22c55e' : pct >= 70 ? '#84cc16' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const explainerHtml = explainer
+    ? `<div style="font-size:12px;color:#6b7280;line-height:1.55;margin:4px 0 14px;">${explainer}</div>`
+    : '<div style="margin-bottom:14px;"></div>';
   return `
-    <tr>
-      <td style="padding:6px 0;font-size:13px;color:#374151;">${label}</td>
-      <td style="padding:6px 0;text-align:right;font-weight:700;color:${color};">${score}/${max}</td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding:0 0 10px;">
-        <div style="background:#e5e7eb;border-radius:9999px;height:5px;">
-          <div style="background:${color};width:${pct}%;height:5px;border-radius:9999px;"></div>
-        </div>
-      </td>
-    </tr>`;
+    <div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:13px;color:#374151;font-weight:600;">${label}</div>
+        <div style="font-size:13px;font-weight:700;color:${color};">${score}/${max}</div>
+      </div>
+      <div style="background:#e5e7eb;border-radius:9999px;height:5px;margin-top:6px;">
+        <div style="background:${color};width:${pct}%;height:5px;border-radius:9999px;"></div>
+      </div>
+      ${explainerHtml}
+    </div>`;
+}
+
+function scoreRowText(label, score, max, explainer) {
+  let out = `${label}: ${score}/${max}`;
+  if (explainer) out += `\n  ${explainer}`;
+  return out;
+}
+
+// Decides what header the coaching block gets, based on close + score state.
+// Returns null if there's no coaching to show (near-perfect, no real gap).
+function coachingHeaderFor(scorecard) {
+  const body = (scorecard.overall_coaching || scorecard.coaching_note || '').trim();
+  if (!body) return null;
+
+  const didClose = scorecard.did_close === true;
+  const score = scorecard.total_score || 0;
+
+  if (didClose && score < 70) return 'YOU CLOSED IT — BUT READ THIS';
+  if (didClose) return 'YOU CLOSED IT — HERE\u2019S WHAT TO TIGHTEN';
+  return 'WHERE THE SALE WAS LOST';
 }
 
 async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
@@ -30,6 +53,10 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
 
   const scoreColor = scorecard.total_score >= 70 ? '#22c55e' : scorecard.total_score >= 50 ? '#f59e0b' : '#ef4444';
   const subject = `Consult Score — ${location.franchise_name} — ${dateShort} — ${scorecard.total_score}/100${scorecard.flagged_for_review ? ' ⚠️' : ''}`;
+
+  const didClose = scorecard.did_close === true;
+  const coachingBody = (scorecard.overall_coaching || scorecard.coaching_note || '').trim();
+  const coachingHeader = coachingHeaderFor(scorecard);
 
   const audioTextBlock = audioUrl
     ? `\n\n--- RECORDING ---\nListen / Download: ${audioUrl}\n(Link expires in 7 days)\n`
@@ -55,91 +82,16 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
       </div>`
     : '';
 
-  const coachingNote = scorecard.coaching_note || '';
-
-  // Detect new-format scorecard. If new fields are populated we render the
-  // structured layout. Otherwise fall back to legacy single-blob rendering.
-  const hasStructuredCoaching = !!(scorecard.overall_coaching || scorecard.sitdown_coaching || scorecard.objection_coaching || scorecard.language_coaching || scorecard.close_coaching);
-  const overallCoaching = scorecard.overall_coaching || coachingNote;
-  const processWarning = scorecard.process_warning || '';
-  const didClose = scorecard.did_close === true;
-
-  // Per-category card renderers
-  function categoryCardHtml(label, score, max, whatSaid, whatToSay, coaching) {
-    if (!whatSaid && !coaching) return '';
-    const pct = Math.round((score / max) * 100);
-    const accent = pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
-    const whatToSayBlock = whatToSay
-      ? `<div style="margin-top:14px;padding:12px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;">
-            <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">What to say instead</div>
-            <div style="font-size:13px;color:#78350f;line-height:1.6;font-style:italic;">${whatToSay}</div>
-          </div>`
-      : '';
-    const whatSaidBlock = whatSaid
-      ? `<div style="padding:12px 14px;background:#f3f4f6;border-left:3px solid #6b7280;border-radius:4px;">
-            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">What you said</div>
-            <div style="font-size:13px;color:#1f2937;line-height:1.6;font-style:italic;">"${whatSaid}"</div>
-          </div>`
-      : '';
-    const coachingBlock = coaching
-      ? `<div style="margin-top:14px;font-size:14px;color:#374151;line-height:1.75;">${coaching.replace(/\n/g, '<br><br>')}</div>`
-      : '';
-    return `
-      <div style="margin:24px 0;padding:20px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
-          <div style="font-size:14px;font-weight:800;color:#111;text-transform:uppercase;letter-spacing:.04em;">${label}</div>
-          <div style="font-size:14px;font-weight:700;color:${accent};">${score}/${max}</div>
-        </div>
-        ${whatSaidBlock}
-        ${whatToSayBlock}
-        ${coachingBlock}
-      </div>`;
-  }
-
-  function categoryCardText(label, score, max, whatSaid, whatToSay, coaching) {
-    if (!whatSaid && !coaching) return '';
-    let block = `\n\n${label.toUpperCase()} — ${score}/${max}`;
-    if (whatSaid) block += `\nWhat you said: "${whatSaid}"`;
-    if (whatToSay) block += `\nWhat to say instead: ${whatToSay}`;
-    if (coaching) block += `\n\n${coaching}`;
-    return block;
-  }
-
-  const sitdownCardHtml = hasStructuredCoaching
-    ? categoryCardHtml('Sit-Down Presentation', scorecard.sitdown_score, 25, scorecard.sitdown_what_said, scorecard.sitdown_what_to_say, scorecard.sitdown_coaching)
-    : '';
-  const objectionCardHtml = hasStructuredCoaching
-    ? categoryCardHtml('Objection Handling', scorecard.objection_score, 25, scorecard.objection_what_said, scorecard.objection_what_to_say, scorecard.objection_coaching)
-    : '';
-  const languageCardHtml = hasStructuredCoaching
-    ? categoryCardHtml('Language & Psychology', scorecard.language_score, 25, scorecard.language_what_said, scorecard.language_what_to_say, scorecard.language_coaching)
-    : '';
-  const closeCardHtml = hasStructuredCoaching
-    ? categoryCardHtml('Close Execution', scorecard.close_score, 25, scorecard.close_what_said, scorecard.close_what_to_say, scorecard.close_coaching)
-    : '';
-
-  // Process warning callout — surfaces only when sale closed but process was weak
-  const processWarningHtml = processWarning
-    ? `<div style="margin:24px 0;padding:18px 22px;background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;">
-        <div style="display:flex;align-items:center;margin-bottom:10px;">
-          <div style="font-size:13px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.06em;">⚠ You closed it — but read this</div>
-        </div>
-        <div style="font-size:14px;color:#78350f;line-height:1.75;">${processWarning.replace(/\n/g, '<br><br>')}</div>
+  // The single coaching block (orange callout). Only renders if there's real coaching.
+  const coachingHtml = coachingHeader && coachingBody
+    ? `<div style="margin:24px 0;padding:20px 24px;background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;">
+        <div style="font-size:13px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">⚠ ${coachingHeader}</div>
+        <div style="font-size:14px;color:#78350f;line-height:1.8;white-space:pre-wrap;">${coachingBody.replace(/\n/g, '<br><br>')}</div>
       </div>`
     : '';
 
-  const processWarningText = processWarning
-    ? `\n\n⚠ YOU CLOSED IT — BUT READ THIS\n${processWarning}\n`
-    : '';
-
-  // Build category text blocks for plain-text version
-  const categoryText = hasStructuredCoaching
-    ? [
-        categoryCardText('Sit-Down Presentation', scorecard.sitdown_score, 25, scorecard.sitdown_what_said, scorecard.sitdown_what_to_say, scorecard.sitdown_coaching),
-        categoryCardText('Objection Handling', scorecard.objection_score, 25, scorecard.objection_what_said, scorecard.objection_what_to_say, scorecard.objection_coaching),
-        categoryCardText('Language & Psychology', scorecard.language_score, 25, scorecard.language_what_said, scorecard.language_what_to_say, scorecard.language_coaching),
-        categoryCardText('Close Execution', scorecard.close_score, 25, scorecard.close_what_said, scorecard.close_what_to_say, scorecard.close_coaching)
-      ].join('')
+  const coachingTextBlock = coachingHeader && coachingBody
+    ? `\n\n⚠ ${coachingHeader}\n${coachingBody}\n`
     : '';
 
   // Plain text version
@@ -148,28 +100,24 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
     `Here is your consultation scorecard for ${date}.`,
     scorecard.flagged_for_review ? '\n⚠️ This consultation has been flagged for review by Mike.\n' : '',
     didClose ? '✓ SALE CLOSED' : '',
-    `\nOVERALL SCORE: ${scorecard.total_score}/100`,
-    `Sit-Down Presentation: ${scorecard.sitdown_score}/25`,
-    `Objection Handling: ${scorecard.objection_score}/25`,
-    `Language & Psychology: ${scorecard.language_score}/25`,
-    `Close Execution: ${scorecard.close_score}/25`,
+    `\nOVERALL SCORE: ${scorecard.total_score}/100\n`,
+    scoreRowText('Sit-Down Presentation', scorecard.sitdown_score, 25, scorecard.sitdown_score_explainer),
+    scoreRowText('Objection Handling', scorecard.objection_score, 25, scorecard.objection_score_explainer),
+    scoreRowText('Language & Psychology', scorecard.language_score, 25, scorecard.language_score_explainer),
+    scoreRowText('Close Execution', scorecard.close_score, 25, scorecard.close_score_explainer),
     `\nSUMMARY:\n${scorecard.ai_summary}`,
-    processWarningText,
-    hasStructuredCoaching ? `\n--- CATEGORY BREAKDOWN ---${categoryText}` : '',
-    `\n\n--- COACHING ---\n${overallCoaching || coachingNote}`,
+    coachingTextBlock,
     audioTextBlock,
     '\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness',
     transcriptText
   ].filter(Boolean).join('\n');
 
-  // HTML version
   const footerMessage = scorecard.total_score >= 85
     ? 'Outstanding work — keep setting the standard.'
     : scorecard.total_score >= 70
     ? 'Solid consult — keep working the process and the scores will follow.'
     : 'Every rep makes you better — keep going.';
 
-  // Closed-sale badge
   const closedBadge = didClose
     ? `<div style="display:inline-block;padding:5px 12px;background:#dcfce7;color:#166534;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-top:8px;">✓ Sale Closed</div>`
     : '';
@@ -196,38 +144,21 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
         ${closedBadge}
       </div>
 
-      <table style="width:100%;border-collapse:collapse;">
-        ${scoreRowHtml('Sit-Down Presentation', scorecard.sitdown_score, 25)}
-        ${scoreRowHtml('Objection Handling', scorecard.objection_score, 25)}
-        ${scoreRowHtml('Language & Psychology', scorecard.language_score, 25)}
-        ${scoreRowHtml('Close Execution', scorecard.close_score, 25)}
-      </table>
-
-      <div style="padding:14px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;margin:20px 0;">
-        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:5px;">Summary</div>
-        <div style="font-size:13px;color:#15803d;">${scorecard.ai_summary}</div>
+      <div style="margin:8px 0 20px;">
+        ${scoreRowHtml('Sit-Down Presentation', scorecard.sitdown_score, 25, scorecard.sitdown_score_explainer)}
+        ${scoreRowHtml('Objection Handling', scorecard.objection_score, 25, scorecard.objection_score_explainer)}
+        ${scoreRowHtml('Language & Psychology', scorecard.language_score, 25, scorecard.language_score_explainer)}
+        ${scoreRowHtml('Close Execution', scorecard.close_score, 25, scorecard.close_score_explainer)}
       </div>
 
-      ${processWarningHtml}
+      <div style="padding:14px 18px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;margin:20px 0;">
+        <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Summary</div>
+        <div style="font-size:13px;color:#15803d;line-height:1.6;">${scorecard.ai_summary}</div>
+      </div>
+
+      ${coachingHtml}
 
       ${audioHtmlBlock}
-
-      ${hasStructuredCoaching ? `
-      <div style="margin:32px 0 16px;">
-        <h2 style="font-size:15px;font-weight:800;color:#111;margin:0 0 4px;">Category Breakdown</h2>
-        <div style="font-size:12px;color:#6b7280;">What you said, what to say next time, and the why behind it.</div>
-      </div>
-      ${sitdownCardHtml}
-      ${objectionCardHtml}
-      ${languageCardHtml}
-      ${closeCardHtml}
-      ` : ''}
-
-      <div style="margin:32px 0 0;padding-top:24px;border-top:2px solid #e5e7eb;">
-        <h2 style="font-size:15px;font-weight:800;color:#111;margin:0 0 4px;">Coaching</h2>
-        <div style="font-size:12px;color:#6b7280;margin-bottom:14px;">From Mike — straight to you.</div>
-        <div style="font-size:14px;color:#374151;line-height:1.85;white-space:pre-wrap;">${overallCoaching || coachingNote}</div>
-      </div>
 
       ${transcriptHtml}
     </div>
@@ -239,8 +170,11 @@ async function sendScorecardEmail(location, recording, scorecard, audioUrl) {
   </div>
 </body></html>`;
 
-  const franchiseeEmail = (location.franchisee_email || '').trim() || MIKE_EMAIL;
-  const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL, location.vp_email, location.club_email].filter(email => email))];
+  // Recipients: franchisee + MIKE + optional vp + optional club, deduped.
+  const franchiseeEmail = (location.franchisee_email || '').trim();
+  const recipients = [...new Set([franchiseeEmail, MIKE_EMAIL, location.vp_email, location.club_email]
+    .map(e => (e || '').trim())
+    .filter(Boolean))];
 
   console.log('[Email] Attempting send to:', recipients.join(', '), '| from:', process.env.EMAIL_FROM || 'onboarding@resend.dev');
 
