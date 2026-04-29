@@ -164,6 +164,7 @@ async function processRecording(
   audioFilePath,
   location_id,
   appointment_id,
+  testOnly,
 ) {
   const location = byLocationId[location_id] || {
     location_id: location_id || "unknown",
@@ -213,7 +214,13 @@ async function processRecording(
       console.log("[Pipeline] Presigned URL generated for " + recording_id);
     const recording = await db.getRecording(recording_id);
     if (location && recording) {
-      await sendScorecardEmail(location, recording, savedScorecard, audioUrl);
+      await sendScorecardEmail(
+        location,
+        recording,
+        savedScorecard,
+        audioUrl,
+        testOnly,
+      );
       const threshold = parseInt(process.env.FLAG_SCORE_THRESHOLD) || 70;
       if (savedScorecard.total_score < threshold)
         console.log(
@@ -281,15 +288,24 @@ app.post("/admin/rescore/:id", async (req, res) => {
       ? "transcribed"
       : "uploaded";
   await db.updateRecording(id, { processing_status: nextStatus });
+  const testOnly =
+    req.query.test_only === "1" || req.query.test_only === "true";
   const started_at = new Date().toISOString();
-  console.log("[Rescore] Manual re-enqueue " + id + " as " + nextStatus);
+  console.log(
+    "[Rescore] Manual re-enqueue " +
+      id +
+      " as " +
+      nextStatus +
+      (testOnly ? " (TEST MODE)" : ""),
+  );
   processRecording(
     id,
     recording.audio_file_url,
     recording.location_id,
     recording.appointment_id,
+    testOnly,
   );
-  res.json({ ok: true, id, started_at });
+  res.json({ ok: true, id, started_at, test_only: !!testOnly });
 });
 
 app.get("/admin", async (req, res) => {

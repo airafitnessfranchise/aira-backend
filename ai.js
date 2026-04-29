@@ -1,10 +1,10 @@
 // ai.js — Updated: conversational coaching prompt with full Aira scenario knowledge
-const axios = require('axios');
-const FormData = require('form-data');
-const fs = require('fs');
-const Anthropic = require('@anthropic-ai/sdk');
-const db = require('./db');
-const { sendScorecardEmail } = require('./email');
+const axios = require("axios");
+const FormData = require("form-data");
+const fs = require("fs");
+const Anthropic = require("@anthropic-ai/sdk");
+const db = require("./db");
+const { sendScorecardEmail } = require("./email");
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -150,6 +150,8 @@ VOICE:
 - Treat the rep as a peer who needs sharper tools, not a student who needs a lecture.
 - When they did something well, name it once and mean it. When they have a gap, name it cleanly and explain the cost.
 
+Two standards apply here, and they are different. Standard one — when YOU teach better wording in your coaching narrative, quote the actual Aira script verbatim. The 5-Day Training material at /mnt/project/Aira_5Day_Training_v10__1_.pdf is the source of truth for every script. Do not paraphrase scripts when teaching them — the exact wording is engineered for specific psychological effect, and approximating it dilutes the lesson. Standard two — when you SCORE the rep, never dock them for paraphrasing if their paraphrase still produced the right feeling and the right response from the prospect. The standard for the rep is outcome and intent. Words that cost the sale get coached. Words that didn't perfectly match the script but still produced the sale do not. These are two different bars and you must hold them both.
+
 ═══════════════════════════════════════════════════════════════
 ANTI-TEMPLATE RULES — VIOLATING ANY OF THESE BREAKS THE COACHING
 ═══════════════════════════════════════════════════════════════
@@ -248,51 +250,79 @@ TRANSCRIPT:
 async function transcribeAudio(audioFilePath) {
   console.log(`[AI] Transcribing ${audioFilePath}...`);
   const form = new FormData();
-  form.append('file', fs.createReadStream(audioFilePath), { filename: 'recording.webm', contentType: 'audio/webm' });
-  form.append('model', 'whisper-1');
-  form.append('language', 'en');
-  const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', form, {
-    headers: { ...form.getHeaders(), 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-    maxBodyLength: Infinity
+  form.append("file", fs.createReadStream(audioFilePath), {
+    filename: "recording.webm",
+    contentType: "audio/webm",
   });
-  console.log(`[AI] Transcription complete: ${response.data.text.length} chars`);
+  form.append("model", "whisper-1");
+  form.append("language", "en");
+  const response = await axios.post(
+    "https://api.openai.com/v1/audio/transcriptions",
+    form,
+    {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      maxBodyLength: Infinity,
+    },
+  );
+  console.log(
+    `[AI] Transcription complete: ${response.data.text.length} chars`,
+  );
   return response.data.text;
 }
 
 async function scoreTranscript(transcript) {
-  console.log('[AI] Scoring transcript with Claude...');
+  console.log("[AI] Scoring transcript with Claude...");
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const message = await anthropic.messages.create({
-        model: 'claude-opus-4-5',
+        model: "claude-opus-4-5",
         max_tokens: 4096,
-        messages: [{ role: 'user', content: SCORING_PROMPT + transcript }]
+        messages: [{ role: "user", content: SCORING_PROMPT + transcript }],
       });
       const rawText = message.content[0].text.trim();
-      console.log(`[AI] Claude raw (attempt ${attempt}): ${rawText.substring(0, 200)}...`);
-      const cleaned = rawText.replace(/```json|```/g, '').trim();
+      console.log(
+        `[AI] Claude raw (attempt ${attempt}): ${rawText.substring(0, 200)}...`,
+      );
+      const cleaned = rawText.replace(/```json|```/g, "").trim();
       const scorecard = JSON.parse(cleaned);
 
       // Required fields — fail if missing
       const required = [
-        'total_score', 'sitdown_score', 'objection_score', 'language_score', 'close_score',
-        'ai_summary', 'overall_coaching'
+        "total_score",
+        "sitdown_score",
+        "objection_score",
+        "language_score",
+        "close_score",
+        "ai_summary",
+        "overall_coaching",
       ];
       for (const field of required) {
-        if (scorecard[field] === undefined) throw new Error(`Missing field: ${field}`);
+        if (scorecard[field] === undefined)
+          throw new Error(`Missing field: ${field}`);
       }
 
       // Optional fields — default to empty string if absent
       const optionalText = [
-        'sitdown_what_said', 'sitdown_what_to_say', 'sitdown_coaching',
-        'objection_what_said', 'objection_what_to_say', 'objection_coaching',
-        'language_what_said', 'language_what_to_say', 'language_coaching',
-        'close_what_said', 'close_what_to_say', 'close_coaching',
-        'process_warning'
+        "sitdown_what_said",
+        "sitdown_what_to_say",
+        "sitdown_coaching",
+        "objection_what_said",
+        "objection_what_to_say",
+        "objection_coaching",
+        "language_what_said",
+        "language_what_to_say",
+        "language_coaching",
+        "close_what_said",
+        "close_what_to_say",
+        "close_coaching",
+        "process_warning",
       ];
       for (const field of optionalText) {
-        if (scorecard[field] === undefined) scorecard[field] = '';
+        if (scorecard[field] === undefined) scorecard[field] = "";
       }
 
       // did_close defaults to false if missing
@@ -302,37 +332,49 @@ async function scoreTranscript(transcript) {
       // that read it (admin panel, scorecard detail page, etc.)
       scorecard.coaching_note = scorecard.overall_coaching;
 
-      const threshold = parseInt(process.env.FLAG_SCORE_THRESHOLD || '70', 10);
+      const threshold = parseInt(process.env.FLAG_SCORE_THRESHOLD || "70", 10);
       scorecard.flagged_for_review = scorecard.total_score < threshold;
-      console.log(`[AI] Score: ${scorecard.total_score}, closed: ${scorecard.did_close}, flagged: ${scorecard.flagged_for_review}`);
+      console.log(
+        `[AI] Score: ${scorecard.total_score}, closed: ${scorecard.did_close}, flagged: ${scorecard.flagged_for_review}`,
+      );
       return scorecard;
     } catch (err) {
       lastError = err;
       console.error(`[AI] Attempt ${attempt} failed: ${err.message}`);
-      if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
   }
-  throw new Error(`Claude scoring failed after 3 attempts: ${lastError.message}`);
+  throw new Error(
+    `Claude scoring failed after 3 attempts: ${lastError.message}`,
+  );
 }
 
-async function processRecording(recordingId, audioFilePath, appointmentId, locationId) {
+async function processRecording(
+  recordingId,
+  audioFilePath,
+  appointmentId,
+  locationId,
+) {
   console.log(`[AI] Processing recording ${recordingId}`);
   try {
     // Update status to transcribing
-    db.updateRecording(recordingId, { processing_status: 'transcribing' });
+    db.updateRecording(recordingId, { processing_status: "transcribing" });
 
     const transcript = await transcribeAudio(audioFilePath);
-    db.updateRecording(recordingId, { transcript, processing_status: 'transcribed' });
+    db.updateRecording(recordingId, {
+      transcript,
+      processing_status: "transcribed",
+    });
 
     // Score the transcript
-    db.updateRecording(recordingId, { processing_status: 'scoring' });
+    db.updateRecording(recordingId, { processing_status: "scoring" });
     const scorecard = await scoreTranscript(transcript);
 
     // Save scorecard via db helper
     db.createScorecard({ recording_id: recordingId, scorecard });
 
     // Mark recording as scored
-    db.updateRecording(recordingId, { processing_status: 'scored' });
+    db.updateRecording(recordingId, { processing_status: "scored" });
 
     // Get full recording and location for email
     const recording = db.getRecording(recordingId);
@@ -342,10 +384,10 @@ async function processRecording(recordingId, audioFilePath, appointmentId, locat
     let locationData = location;
     if (!locationData) {
       try {
-        const { byLocationId } = require('./locations');
+        const { byLocationId } = require("./locations");
         locationData = byLocationId(locationId);
       } catch (e) {
-        console.warn('[AI] Could not resolve location for email:', e.message);
+        console.warn("[AI] Could not resolve location for email:", e.message);
       }
     }
 
@@ -357,10 +399,9 @@ async function processRecording(recordingId, audioFilePath, appointmentId, locat
 
     console.log(`[AI] Pipeline complete for ${recordingId}`);
     return scorecard;
-
   } catch (err) {
     console.error(`[AI] Pipeline failed for ${recordingId}:`, err);
-    db.updateRecording(recordingId, { processing_status: 'failed' });
+    db.updateRecording(recordingId, { processing_status: "failed" });
     throw err;
   }
 }
