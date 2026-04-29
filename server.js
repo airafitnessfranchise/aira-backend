@@ -64,17 +64,11 @@ function triggerTablet(location_id, appointment_id, contact_name) {
 }
 
 app.post('/webhook/ghl', async (req, res) => {
-  console.log('[GHL] Webhook received:', JSON.stringify(req.body, null, 2));
-  const body = req.body;
-  const calendarId = body.calendar_id || body.calendarId || (body.calendar ? body.calendar.id : null) || (body.appointment ? body.appointment.calendar_id : null) || null;
-  const appointmentId = body.id || body.appointment_id || body.appointmentId || (body.appointment ? body.appointment.id : null) || uuidv4();
-  const contactName = body.contact_name || body.contactName || (body.contact ? body.contact.name : null) || 'Walk-in';
-  console.log('[GHL] Calendar: ' + calendarId + ', Contact: ' + contactName);
-  const location = calendarId ? byCalendarId[calendarId] : null;
-  if (!location) { console.warn('[GHL] No location for calendar_id: ' + calendarId); return res.json({ success: false, message: 'No location mapped to ' + calendarId }); }
-  const recording = await db.createRecording({ appointment_id: appointmentId, location_id: location.location_id, contact_name: contactName });
-  const triggered = triggerTablet(location.location_id, appointmentId, contactName);
-  res.json({ success: true, location: location.franchise_name, appointment_id: appointmentId, recording_id: recording.recording_id, tablet_triggered: triggered });
+  // GHL auto-trigger DISABLED — tablets are manual-only.
+  // We still accept the webhook so GHL doesn't error, and we log the payload
+  // for debugging. No DB row, no tablet trigger, no ghost recordings.
+  console.log('[GHL] Webhook received (auto-trigger disabled):', JSON.stringify(req.body, null, 2));
+  res.json({ success: true, message: 'Webhook received (auto-trigger disabled — manual recording only)' });
 });
 
 app.post('/upload/recording', upload.single('audio_file'), async (req, res) => {
