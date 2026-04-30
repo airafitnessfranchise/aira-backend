@@ -225,16 +225,36 @@ Click any card to see the full transcript and coaching note. Use this with VPs i
 
 ### Add a new gym
 
-Go to `/admin/locations`. There's a form at the top. Fill in:
+Go to **`/admin/locations`** (linked from the `/admin` subheader). The page has two parts:
 
-- **Location ID** — short slug like `naples-01` (lowercase, hyphens only)
-- **Franchise name** — display name like "Aira Fitness Naples"
-- **Franchisee name** — owner's name (optional — leaves the email greeting generic if blank)
-- **Franchisee email** — primary recipient for scorecard emails
-- **VP email** — optional, gets a copy of every scorecard
-- **GHL Calendar ID** — optional, used if you wire up the GHL webhook later
+**1) An add-a-gym form at the top.** Fill in:
 
-Click Add. The new gym is immediately available everywhere — `/admin` leaderboard, `/practice` location dropdown, `/airafitnessclosinggame` location dropdown, scorecard emails. No restart needed.
+| Field                | Required? | Notes                                                                                                                                      |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Location ID**      | yes       | Short URL-safe slug like `naples-01` (lowercase letters, numbers, and hyphens only). Used internally to tag every recording from this gym. |
+| **Franchise Name**   | yes       | Display name like "Aira Fitness Naples." Shows on emails, dashboards, dropdowns.                                                           |
+| **Franchisee Name**  | no        | Owner's name. Used in email greetings. If blank, the greeting falls back to "Hi Aira Fitness Naples Team,"                                 |
+| **Franchisee Email** | yes       | Primary recipient for every scorecard email from this gym.                                                                                 |
+| **VP Email**         | no        | Optional. Gets cc'd on every scorecard from this gym.                                                                                      |
+| **Club Email**       | no        | Optional. Additional copy.                                                                                                                 |
+| **GHL Calendar ID**  | no        | Optional. Used by the GHL webhook integration (currently disabled — leave blank if unsure).                                                |
+
+Click **Add Gym**. The new gym goes live **everywhere immediately, no restart needed**:
+
+- Scorecard emails route to the right addresses (franchisee + VP if set + Mike)
+- The gym shows up in the `/admin` per-location leaderboard
+- The gym shows up in the `/practice` "Your Gym" dropdown
+- The gym shows up in the `/airafitnessclosinggame` splash dropdown
+- Tablet recordings tagged with this `location_id` resolve correctly
+
+**2) A list of every gym** (built-in + custom) below the form. Each row shows the franchise name + slug, franchisee name, franchisee email, VP email, and a type pill:
+
+- **Built-in** — gyms hardcoded in `locations.js` (Fox Lake, Mishawaka). These can't be deleted from the UI; they live in code. If you ever need one removed, ask Claude.
+- **Custom** — gyms added via this page. Each has a **Delete** button. Click it (with confirmation) and the gym is removed from the database and from the in-memory cache instantly.
+
+**A note on edits:** the page currently has Add + Delete but no Edit. To change a custom gym's email, just delete and re-add — re-adding with the same Location ID overwrites the previous record. The historical recordings tied to that ID stay attached to the (re-added) gym.
+
+**A note on slugs:** the Location ID can't collide with a built-in. If you try to use `fox-lake-01`, the form will refuse and show an error. Pick something else.
 
 ### Re-score a consult
 
