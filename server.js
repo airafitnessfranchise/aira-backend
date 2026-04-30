@@ -7,9 +7,22 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-const { byCalendarId, byLocationId } = require("./locations");
+const {
+  byCalendarId,
+  byLocationId,
+  canonicalLocationId,
+  locations: ALL_LOCATIONS,
+} = require("./locations");
 const { initDb, ...db } = require("./db");
-const { transcribeAudio, scoreTranscript } = require("./ai");
+const {
+  transcribeAudio,
+  scoreTranscript,
+  PROSPECT_PERSONAS,
+  startPracticeSession,
+  chatAsProspect,
+  getPracticeSession,
+  scorePracticeSession,
+} = require("./ai");
 const { sendScorecardEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
 const vpRoutes = require("./vp-routes");
@@ -423,7 +436,7 @@ app.get("/admin", async (req, res) => {
     // even with 0 scorecards if they have any recordings — VPs want to see all their gyms.
     const locStats = new Map();
     for (const r of recordings) {
-      const k = r.location_id || "unknown";
+      const k = canonicalLocationId(r.location_id) || "unknown";
       if (!locStats.has(k)) {
         const meta = byLocationId[k] || {};
         locStats.set(k, {
@@ -717,7 +730,7 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="subhead"><div class="subhead-inner">
   <div class="eyebrow">Consult Recorder</div>
   <div class="title">Admin Dashboard</div>
-  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a></div>
+  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
 </div></div>
 <div class="wrap">
   <div class="kpi-grid">
@@ -1112,6 +1125,304 @@ a{color:#0284C7;}
     console.error("[Library] Error:", err.message);
     res.status(500).send("Error loading library: " + err.message);
   }
+});
+
+// ─────────── PRACTICE BOT — v0 ───────────
+// Role-play a gym prospect, get scored at the end. No auth, no persistence in v0.
+// Location dropdown (from locations.js) is informational so future analytics can be tagged.
+
+app.post("/practice/start", async (req, res) => {
+  try {
+    const difficulty = String(req.body.difficulty || "medium").toLowerCase();
+    if (!PROSPECT_PERSONAS[difficulty])
+      return res.status(400).json({ ok: false, error: "Invalid difficulty" });
+    const location_id = req.body.location_id
+      ? canonicalLocationId(req.body.location_id)
+      : null;
+    const out = startPracticeSession({ difficulty, location_id });
+    res.json({ ok: true, ...out });
+  } catch (err) {
+    console.error("[Practice] start error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/practice/turn", async (req, res) => {
+  try {
+    const { session_id, message } = req.body;
+    if (!session_id || !message)
+      return res
+        .status(400)
+        .json({ ok: false, error: "session_id and message required" });
+    const reply = await chatAsProspect(session_id, message);
+    res.json({ ok: true, reply });
+  } catch (err) {
+    console.error("[Practice] turn error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/practice/end", async (req, res) => {
+  try {
+    const { session_id } = req.body;
+    if (!session_id)
+      return res.status(400).json({ ok: false, error: "session_id required" });
+    const session = getPracticeSession(session_id);
+    if (!session)
+      return res
+        .status(404)
+        .json({ ok: false, error: "Session not found or expired" });
+    if (session.messages.length < 4) {
+      return res.status(400).json({
+        ok: false,
+        error: "Conversation too short to score (need at least 2 exchanges)",
+      });
+    }
+    const scorecard = await scorePracticeSession(session_id);
+    res.json({ ok: true, scorecard });
+  } catch (err) {
+    console.error("[Practice] end error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/practice", (req, res) => {
+  const locOptions = ALL_LOCATIONS.map(
+    (l) => `<option value="${l.location_id}">${l.franchise_name}</option>`,
+  ).join("");
+  const diffOptions = Object.entries(PROSPECT_PERSONAS)
+    .map(
+      ([k, p]) =>
+        `<option value="${k}"${k === "medium" ? " selected" : ""}>${p.label} — ${p.description}</option>`,
+    )
+    .join("");
+
+  res.send(`<!DOCTYPE html><html><head><title>Aira Practice — Objection Bot</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column;}
+a{color:#0284C7;}
+.brand{background:#0A0A0A;padding:18px 28px;text-align:center;flex-shrink:0;}
+.brand-mark{font-size:20px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:18px 28px;flex-shrink:0;}
+.subhead-inner{max-width:760px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:4px;}
+.title{font-size:20px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
+.subtitle{font-size:12px;color:#6B7280;margin-top:2px;}
+.back{font-size:12px;color:#6B7280;text-decoration:none;font-weight:600;}
+.back:hover{color:#0A0A0A;}
+
+.stage{flex:1;display:flex;flex-direction:column;max-width:760px;width:100%;margin:0 auto;padding:20px 24px;min-height:0;}
+
+.start-screen{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:32px;}
+.start-eyebrow{font-size:11px;font-weight:800;color:#00AEEF;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;}
+.start-title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin-bottom:8px;}
+.start-body{font-size:14px;color:#6B7280;line-height:1.6;margin-bottom:20px;}
+label.fld{display:block;margin-bottom:14px;}
+label.fld span{display:block;font-size:11px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+label.fld select{width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;background:#fff;font-family:inherit;}
+button.cta{display:inline-block;padding:12px 28px;background:#0A0A0A;color:#fff;border:0;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;}
+button.cta:hover{background:#1F2937;}
+button.cta.secondary{background:#fff;color:#0A0A0A;border:1px solid #D1D5DB;}
+button.cta.secondary:hover{background:#F3F4F6;}
+button.cta:disabled{opacity:.5;cursor:not-allowed;}
+
+.chat-frame{background:#fff;border:1px solid #E5E7EB;border-radius:10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+.chat-header{padding:14px 18px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.chat-persona{font-size:12px;color:#6B7280;font-weight:600;}
+.chat-persona b{color:#0A0A0A;}
+.chat-end{padding:6px 14px;background:#fff;border:1px solid #DC2626;color:#DC2626;border-radius:9999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;}
+.chat-end:hover{background:#FEE2E2;}
+
+.chat-body{flex:1;overflow-y:auto;padding:18px;background:#F9FAFB;display:flex;flex-direction:column;gap:10px;}
+.bubble{max-width:80%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;}
+.bubble.prospect{background:#fff;border:1px solid #E5E7EB;color:#111827;align-self:flex-start;border-bottom-left-radius:4px;}
+.bubble.rep{background:#0A0A0A;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.bubble.thinking{background:#fff;border:1px solid #E5E7EB;color:#9CA3AF;align-self:flex-start;font-style:italic;border-bottom-left-radius:4px;}
+
+.chat-input{padding:14px;border-top:1px solid #F3F4F6;display:flex;gap:10px;flex-shrink:0;background:#fff;}
+.chat-input textarea{flex:1;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;font-family:inherit;resize:none;min-height:42px;max-height:140px;line-height:1.4;}
+.chat-input textarea:focus{outline:none;border-color:#00AEEF;}
+.chat-input button{padding:10px 20px;background:#00AEEF;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+.chat-input button:hover{background:#0284C7;}
+.chat-input button:disabled{background:#9CA3AF;cursor:not-allowed;}
+
+.score-screen{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:28px;}
+.score-eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;}
+.score-title{font-size:22px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin-bottom:18px;}
+.score-big-wrap{text-align:center;padding:22px;background:#F9FAFB;border-radius:8px;margin-bottom:18px;}
+.score-label{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
+.score-num{font-size:54px;font-weight:900;line-height:1.05;margin-top:6px;letter-spacing:-.02em;}
+.score-num span{font-size:20px;color:#9CA3AF;font-weight:600;}
+.closed-pill{display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;}
+.closed-pill.no{background:#fff;border:1px solid #DC2626;color:#DC2626;}
+.score-summary{padding:14px 16px;background:#F9FAFB;border-left:3px solid #00AEEF;border-radius:4px;margin-bottom:14px;font-size:13px;color:#111827;line-height:1.55;}
+.cat-row{margin-top:14px;}
+.cat-row-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.cat-label{font-size:13px;font-weight:700;color:#111827;}
+.cat-score{font-size:14px;font-weight:800;}
+.cat-bar{background:#F3F4F6;border-radius:9999px;height:6px;overflow:hidden;}
+.cat-bar-fill{height:6px;border-radius:9999px;}
+.coaching{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:6px;padding:18px 20px;margin-top:18px;font-size:14px;color:#111827;line-height:1.65;}
+.coaching p{margin-top:10px;}
+.coaching p:first-child{margin-top:0;}
+.coaching-header{font-size:11px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;}
+.btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+
+.hidden{display:none !important;}
+</style></head><body>
+
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div>
+    <div class="eyebrow">Practice</div>
+    <div class="title">Objection Bot</div>
+    <div class="subtitle">Run a mock consult against an AI prospect. Get scored at the end.</div>
+  </div>
+  <a href="/admin" class="back">← Back to Admin</a>
+</div></div>
+
+<div class="stage">
+
+  <div id="start" class="start-screen">
+    <div class="start-eyebrow">Set up your consult</div>
+    <div class="start-title">Pick a prospect to practice against</div>
+    <div class="start-body">A new prospect walks into your gym. You greet them, sit them down, present pricing, handle objections, and close the sale. The bot reacts to what you actually say — same psychology as your real consults. You can end the consult any time and get scored.</div>
+
+    <label class="fld"><span>Difficulty</span>
+      <select id="difficulty">${diffOptions}</select>
+    </label>
+    <label class="fld"><span>Your Location</span>
+      <select id="location">
+        <option value="">— Select your gym —</option>
+        ${locOptions}
+      </select>
+    </label>
+    <button class="cta" id="start-btn">Start Consult →</button>
+  </div>
+
+  <div id="chat" class="chat-frame hidden">
+    <div class="chat-header">
+      <div class="chat-persona">Practicing against: <b id="persona-label">—</b></div>
+      <button class="chat-end" id="end-btn">End &amp; Score</button>
+    </div>
+    <div class="chat-body" id="messages"></div>
+    <div class="chat-input">
+      <textarea id="rep-input" placeholder="What do you say to the prospect?" rows="1"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+  </div>
+
+  <div id="score" class="score-screen hidden"></div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let SESSION_ID = null;
+
+function bubble(role, text) {
+  const div = document.createElement('div');
+  div.className = 'bubble ' + role;
+  div.textContent = text;
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+  return div;
+}
+
+async function postJson(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return r.json();
+}
+
+$('start-btn').onclick = async () => {
+  const difficulty = $('difficulty').value;
+  const location_id = $('location').value;
+  if (!location_id) { alert('Please select your gym'); return; }
+  $('start-btn').disabled = true;
+  $('start-btn').textContent = 'Starting…';
+  const r = await postJson('/practice/start', { difficulty, location_id });
+  if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
+  SESSION_ID = r.session_id;
+  $('persona-label').textContent = r.persona_label + ' Prospect';
+  $('start').classList.add('hidden');
+  $('chat').classList.remove('hidden');
+  bubble('prospect', r.opening);
+  $('rep-input').focus();
+};
+
+const repInput = $('rep-input');
+repInput.addEventListener('input', () => {
+  repInput.style.height = 'auto';
+  repInput.style.height = Math.min(repInput.scrollHeight, 140) + 'px';
+});
+repInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send-btn').click(); }
+});
+
+$('send-btn').onclick = async () => {
+  const msg = repInput.value.trim();
+  if (!msg) return;
+  bubble('rep', msg);
+  repInput.value = '';
+  repInput.style.height = 'auto';
+  $('send-btn').disabled = true;
+  const thinking = bubble('thinking', 'thinking…');
+  const r = await postJson('/practice/turn', { session_id: SESSION_ID, message: msg });
+  thinking.remove();
+  $('send-btn').disabled = false;
+  if (!r.ok) { bubble('prospect', '[error: ' + r.error + ']'); return; }
+  bubble('prospect', r.reply);
+  repInput.focus();
+};
+
+$('end-btn').onclick = async () => {
+  if (!confirm('End the consult and get scored?')) return;
+  $('end-btn').disabled = true;
+  $('chat').classList.add('hidden');
+  $('score').classList.remove('hidden');
+  $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div style="color:#6B7280;font-size:13px;">This usually takes 10-15 seconds.</div>';
+  const r = await postJson('/practice/end', { session_id: SESSION_ID });
+  if (!r.ok) { $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>'; return; }
+  renderScorecard(r.scorecard);
+};
+
+function colorFor(score, max) {
+  const pct = (score / max) * 100;
+  return pct >= 70 ? '#00AEEF' : pct >= 50 ? '#0284C7' : '#DC2626';
+}
+
+function renderScorecard(s) {
+  const total = s.total_score || 0;
+  const totalColor = colorFor(total, 100);
+  const closed = s.did_close === true;
+  const sections = [
+    ['Sit-Down Presentation', s.sitdown_score, s.sitdown_score_explainer],
+    ['Objection Handling', s.objection_score, s.objection_score_explainer],
+    ['Language & Psychology', s.language_score, s.language_score_explainer],
+    ['Close Execution', s.close_score, s.close_score_explainer],
+  ];
+  const catRows = sections.map(([label, score, expl]) => {
+    const c = colorFor(score, 25);
+    const pct = (score / 25) * 100;
+    return '<div class="cat-row"><div class="cat-row-head"><div class="cat-label">' + label + '</div><div class="cat-score" style="color:' + c + ';">' + score + '<span style="color:#9CA3AF;font-weight:600;"> / 25</span></div></div><div class="cat-bar"><div class="cat-bar-fill" style="background:' + c + ';width:' + pct + '%;"></div></div>' + (expl ? '<div style="font-size:13px;color:#6B7280;line-height:1.5;margin:6px 0 0;">' + expl + '</div>' : '') + '</div>';
+  }).join('');
+  const coaching = (s.overall_coaching || s.coaching_note || '').trim();
+  const coachingHtml = coaching ? '<div class="coaching"><div class="coaching-header">Coaching Notes</div><p>' + coaching.replace(/\\n\\n+/g, '</p><p>').replace(/\\n/g, ' ') + '</p></div>' : '';
+
+  $('score').innerHTML =
+    '<div class="score-eyebrow">Practice Result</div>' +
+    '<div class="score-title">Your Scorecard</div>' +
+    '<div class="score-big-wrap"><div class="score-label">Overall Score</div><div class="score-num" style="color:' + totalColor + ';">' + total + '<span> / 100</span></div>' +
+    (closed ? '<div class="closed-pill"><span style="color:#00AEEF;">✓</span> Sale Closed</div>' : '<div class="closed-pill no">No Sale</div>') +
+    '</div>' +
+    (s.ai_summary ? '<div class="score-summary">' + s.ai_summary + '</div>' : '') +
+    catRows +
+    coachingHtml +
+    '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button> <button class="cta secondary" onclick="window.location=\\'/admin\\'">Back to Admin</button></div>';
+}
+</script>
+</body></html>`);
 });
 
 app.get("/scorecard/:id", async (req, res) => {

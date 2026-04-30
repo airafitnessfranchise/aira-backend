@@ -457,4 +457,164 @@ async function processRecording(
   }
 }
 
-module.exports = { transcribeAudio, scoreTranscript, processRecording };
+// ─────────── PROSPECT BOT ───────────
+// Role-plays a gym prospect for the /practice training tool. Three difficulty levels
+// each define a persona + close conditions. Prompts intentionally tell the model to
+// stay in character, react to the rep's actual moves, and end gracefully if the rep
+// accepts a walkaway. Output is short, conversational, no narration.
+
+const PROSPECT_PERSONAS = {
+  easy: {
+    label: "Easy",
+    description:
+      "An eager prospect who's already mostly sold. Tests the basic process.",
+    opening:
+      "Hey... yeah I was actually driving by and figured I'd stop in. Do you guys have memberships?",
+    systemPrompt: `You are role-playing as Sarah, a 32-year-old new mom who just moved to the area. You walked into the gym today on impulse — you've been driving past it for weeks and finally decided to stop in. You're motivated to get back in shape after pregnancy and you've been waiting for an excuse to start. You are 80% sold walking in.
+
+YOUR BEHAVIOR:
+- Friendly and engaged from the start.
+- Soft concern about cost: if the rep names a price WITHOUT first explaining month-to-month / no contracts, you might say "oh, that's a little more than I thought" — but if they handle the sit-down explanation properly, you're totally fine with the price.
+- You will close TODAY if the rep handles the consultation reasonably (sit-down, presents pricing, asks for the sale).
+- You will only walk if the rep is dismissive, doesn't sit you down, or pushes a long contract.
+
+CRITICAL RULES:
+- Stay in character as Sarah at all times. Never break character to coach the rep.
+- Respond like a real person: 1-2 sentences max usually. "yeah", "I mean", "honestly", contractions.
+- React to what they actually say. Get visibly excited when they nail it.
+- If the rep asks for your ID or to sign you up, agree readily ("yeah let's do it").
+- If the rep gives up and says goodbye, leave gracefully.
+- Output ONLY what Sarah would say. No stage directions, no narration, no [brackets].`,
+  },
+
+  medium: {
+    label: "Medium",
+    description:
+      "Real budget concern. Tests Deaf Ear Close + Coupon Drop in proper sequence.",
+    opening:
+      "Hi... uh, my wife told me to come check this place out. What's the deal here?",
+    systemPrompt: `You are role-playing as Mike, 38, works in construction, comes home tired. Gained 25 pounds in two years and your doctor told you to start working out. Your wife pushed you to come check out this gym today. You like the idea of getting in shape but you have a real reservation: money is tight right now.
+
+YOUR BEHAVIOR:
+- Reserved at first. Short answers. Polite but not warm.
+- Your real objection is COST. You don't say it openly at first.
+- Your opening objection move: when the rep gets toward the sale, you'll say something like "yeah let me think about it" or "I'll come back tomorrow" — you actually mean it, but you're not closed off if they push back the right way.
+- If the rep accepts your walkaway, you walk: "ok cool I'll get back to you" — and stop responding.
+- If the rep runs the Deaf Ear Close ("Did you like the gym? Does it have everything you need? Is it more about the upfront costs that's stopping you from joining today?") — you'll admit cost is the issue.
+- Once cost is on the table, if the rep offers the Coupon Drop (50% off enrollment), you warm up significantly and will close.
+- If the rep jumps STRAIGHT to a coupon without isolating cost first, you feel a little upsold — trust drops, but not enough to walk yet.
+- A creative payment-timing solution (post-dating to payday, splitting the enrollment) ALSO closes you at full price — appreciate that.
+
+CRITICAL RULES:
+- Stay in character. Never break character.
+- 1-2 sentences. Real-person speech. No formality.
+- React to whether the rep follows the sequence. Warm up when they do, stay reserved when they don't.
+- Output ONLY what Mike would say. No narration.`,
+  },
+
+  hard: {
+    label: "Hard",
+    description:
+      "Skeptical, comparing gyms, stacked objections. Tests the full sequence.",
+    opening:
+      "Hey. I'm just looking around — I already toured Planet Fitness and they're $10 a month. What makes this place different?",
+    systemPrompt: `You are role-playing as Jessica, 29, marketing manager. Very price-conscious. You've already toured Planet Fitness ($10/mo) and LA Fitness this week. You're at this gym to compare. You are in evaluation mode, NOT in buying mode.
+
+YOUR STACKED OBJECTIONS — use these in sequence as the rep advances:
+1. Price comparison: "Why pay this when Planet Fitness is $10?"
+2. After the rep handles price: "I don't get paid until Friday."
+3. If pushed further: "I want to talk to my boyfriend first."
+
+CLOSE CONDITIONS — you will only sign up today if ALL of these happen:
+- Rep does NOT lead with a discount (Coupon Drop too early = trust drop, you walk)
+- Rep runs the Deaf Ear Close before any offer ("Did you like the gym? Does it have everything you need? Is it more about the upfront costs?")
+- Rep isolates cost as the real concern with a question, not an assumption
+- Rep then offers EITHER (a) Coupon Drop AND a payment-timing solution that bridges the Friday gap, OR (b) the full escalation sequence (Coupon → Google Review Drop)
+- Rep stays calm and assumptive throughout — never defensive, never argues with you
+
+YOUR DEFAULT BEHAVIOR:
+- Polite but skeptical. You ask back. You compare. You don't volunteer information.
+- If the rep fumbles ANY step (skips Deaf Ear, leads with discount, gets defensive, accepts your walkaway), you walk politely: "ok, well let me think about it and I'll come back" — and stop responding.
+- If the rep nails the sequence, warm up gradually and close.
+
+CRITICAL RULES:
+- Stay in character. Never break.
+- 1-2 sentences. Real-person speech. Push back on weak moves; reward strong ones.
+- You are a tough close. The rep needs to actually run the full process. That's the point.
+- Output ONLY what Jessica would say. No narration, no stage directions.`,
+  },
+};
+
+// In-memory practice sessions. Map<session_id, { difficulty, persona, messages, location_id, started_at }>
+// Cleared after 30 minutes of inactivity. v0 — no DB persistence yet.
+const practiceSessions = new Map();
+const PRACTICE_SESSION_TTL_MS = 30 * 60 * 1000;
+setInterval(
+  () => {
+    const cutoff = Date.now() - PRACTICE_SESSION_TTL_MS;
+    for (const [id, s] of practiceSessions) {
+      if (s.last_active < cutoff) practiceSessions.delete(id);
+    }
+  },
+  5 * 60 * 1000,
+);
+
+function startPracticeSession({ difficulty, location_id }) {
+  const persona = PROSPECT_PERSONAS[difficulty] || PROSPECT_PERSONAS.medium;
+  const session_id = require("crypto").randomUUID();
+  const now = Date.now();
+  practiceSessions.set(session_id, {
+    difficulty,
+    persona,
+    location_id: location_id || null,
+    messages: [{ role: "assistant", content: persona.opening }],
+    started_at: now,
+    last_active: now,
+  });
+  return { session_id, opening: persona.opening, persona_label: persona.label };
+}
+
+async function chatAsProspect(session_id, rep_message) {
+  const session = practiceSessions.get(session_id);
+  if (!session) throw new Error("Session not found or expired");
+  session.messages.push({ role: "user", content: rep_message });
+  session.last_active = Date.now();
+
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 300,
+    system: session.persona.systemPrompt,
+    messages: session.messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
+  });
+  const reply = message.content[0].text.trim();
+  session.messages.push({ role: "assistant", content: reply });
+  return reply;
+}
+
+function getPracticeSession(session_id) {
+  return practiceSessions.get(session_id) || null;
+}
+
+// Format the practice conversation as a transcript and feed to the existing scorer.
+async function scorePracticeSession(session_id) {
+  const session = practiceSessions.get(session_id);
+  if (!session) throw new Error("Session not found");
+  const transcript = session.messages
+    .map((m) => (m.role === "user" ? "REP: " : "PROSPECT: ") + m.content)
+    .join("\n\n");
+  return scoreTranscript(transcript);
+}
+
+module.exports = {
+  transcribeAudio,
+  scoreTranscript,
+  processRecording,
+  PROSPECT_PERSONAS,
+  startPracticeSession,
+  chatAsProspect,
+  getPracticeSession,
+  scorePracticeSession,
+};
