@@ -64,6 +64,9 @@ async function initDb() {
       difficulty      TEXT,
       persona_label   TEXT,
       scenario_id     TEXT,
+      player_id       TEXT,
+      player_name     TEXT,
+      mode            TEXT DEFAULT 'practice',
       messages        JSONB,
       total_score     INTEGER DEFAULT 0,
       sitdown_score   INTEGER DEFAULT 0,
@@ -93,9 +96,18 @@ async function initDb() {
       created_at      TIMESTAMPTZ DEFAULT NOW()
     )
   `);
-  // Add scenario_id to existing tables that pre-date the column.
+  // Add columns to existing tables that pre-date them.
   await pool.query(
     `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS scenario_id TEXT`,
+  );
+  await pool.query(
+    `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS player_id TEXT`,
+  );
+  await pool.query(
+    `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS player_name TEXT`,
+  );
+  await pool.query(
+    `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'practice'`,
   );
   console.log("[DB] Tables ready");
 }
@@ -279,13 +291,16 @@ async function savePracticeSession({
   difficulty,
   persona_label,
   scenario_id,
+  player_id,
+  player_name,
+  mode,
   messages,
   scorecard,
 }) {
   const sc = scorecard || {};
   await pool.query(
     `INSERT INTO practice_sessions (
-      session_id, location_id, difficulty, persona_label, scenario_id, messages,
+      session_id, location_id, difficulty, persona_label, scenario_id, player_id, player_name, mode, messages,
       total_score, sitdown_score, objection_score, language_score, close_score, did_close,
       ai_summary, overall_coaching,
       sitdown_score_explainer, objection_score_explainer, language_score_explainer, close_score_explainer,
@@ -295,15 +310,15 @@ async function savePracticeSession({
       close_what_said, close_what_to_say, close_coaching,
       process_warning
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,
-      $7,$8,$9,$10,$11,$12,
-      $13,$14,
-      $15,$16,$17,$18,
-      $19,$20,$21,
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,
+      $10,$11,$12,$13,$14,$15,
+      $16,$17,
+      $18,$19,$20,$21,
       $22,$23,$24,
       $25,$26,$27,
       $28,$29,$30,
-      $31
+      $31,$32,$33,
+      $34
     )
     ON CONFLICT (session_id) DO NOTHING`,
     [
@@ -312,6 +327,9 @@ async function savePracticeSession({
       difficulty,
       persona_label,
       scenario_id || null,
+      player_id || null,
+      player_name || null,
+      mode || "practice",
       JSON.stringify(messages),
       sc.total_score || 0,
       sc.sitdown_score || 0,
@@ -352,6 +370,69 @@ async function getAllPracticeSessions() {
   return rows;
 }
 
+// Game progress for one player. Returns scenarios_passed (passed = closed AND
+// total_score >= 70), total_xp, attempts_total, closes_total, leaderboard rank.
+async function getPlayerGameProgress(player_id) {
+  if (!player_id) return null;
+  const { rows } = await pool.query(
+    `SELECT scenario_id, MAX(total_score) AS best_score, BOOL_OR(did_close AND total_score >= 70) AS passed,
+            COUNT(*) AS attempts, BOOL_OR(did_close) AS ever_closed
+     FROM practice_sessions
+     WHERE player_id = $1 AND mode = 'game' AND scenario_id IS NOT NULL
+     GROUP BY scenario_id`,
+    [player_id],
+  );
+  const totals = await pool.query(
+    `SELECT COUNT(*) AS attempts_total,
+            SUM(CASE WHEN did_close THEN 1 ELSE 0 END) AS closes_total,
+            COALESCE(SUM(CASE WHEN did_close AND total_score >= 70 THEN total_score ELSE 0 END), 0) AS total_xp,
+            MAX(player_name) AS player_name
+     FROM practice_sessions
+     WHERE player_id = $1 AND mode = 'game'`,
+    [player_id],
+  );
+  return {
+    per_scenario: rows.map((r) => ({
+      scenario_id: r.scenario_id,
+      best_score: r.best_score,
+      passed: r.passed === true,
+      attempts: Number(r.attempts),
+      ever_closed: r.ever_closed === true,
+    })),
+    attempts_total: Number(totals.rows[0].attempts_total || 0),
+    closes_total: Number(totals.rows[0].closes_total || 0),
+    total_xp: Number(totals.rows[0].total_xp || 0),
+    player_name: totals.rows[0].player_name || null,
+  };
+}
+
+async function getGameLeaderboard(limit = 25) {
+  const { rows } = await pool.query(
+    `SELECT player_id,
+            MAX(player_name) AS player_name,
+            MAX(location_id) AS location_id,
+            COALESCE(SUM(CASE WHEN did_close AND total_score >= 70 THEN total_score ELSE 0 END), 0) AS total_xp,
+            SUM(CASE WHEN did_close THEN 1 ELSE 0 END) AS closes_total,
+            COUNT(*) AS attempts_total,
+            COUNT(DISTINCT CASE WHEN did_close AND total_score >= 70 THEN scenario_id END) AS scenarios_passed
+     FROM practice_sessions
+     WHERE mode = 'game' AND player_id IS NOT NULL
+     GROUP BY player_id
+     ORDER BY total_xp DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return rows.map((r) => ({
+    player_id: r.player_id,
+    player_name: r.player_name,
+    location_id: r.location_id,
+    total_xp: Number(r.total_xp),
+    closes_total: Number(r.closes_total),
+    attempts_total: Number(r.attempts_total),
+    scenarios_passed: Number(r.scenarios_passed),
+  }));
+}
+
 module.exports = {
   initDb,
   createRecording,
@@ -366,4 +447,6 @@ module.exports = {
   getAllScorecards,
   savePracticeSession,
   getAllPracticeSessions,
+  getPlayerGameProgress,
+  getGameLeaderboard,
 };

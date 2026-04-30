@@ -509,12 +509,14 @@ async function processRecording(
 const PROSPECT_PERSONAS = {
   easy: {
     label: "Easy",
-    description: "An eager prospect who's already mostly sold. Tests the basic process.",
+    description:
+      "An eager prospect who's already mostly sold. Tests the basic process.",
     scenarios: [
       {
         id: "sarah-newmom",
         name: "Sarah",
-        opening: "OK cool, the gym actually looks great. I love how clean it is. So... what does a membership cost here?",
+        opening:
+          "OK cool, the gym actually looks great. I love how clean it is. So... what does a membership cost here?",
         systemPrompt: `You are role-playing as Sarah, a 32-year-old new mom who just moved to the area. You walked into the gym today on impulse — you've been driving past it for weeks and finally decided to stop in. You're motivated to get back in shape after pregnancy and 80% sold walking in. You have ALREADY done the tour and are now sitting at the rep's desk. Do NOT role-play the tour.
 
 BEHAVIOR:
@@ -528,7 +530,8 @@ RULES: Stay in character. 1-2 sentences. Real-person speech. Output only what Sa
       {
         id: "marcus-divorced",
         name: "Marcus",
-        opening: "Hey, alright. So just so we're clear up front — is this one of those places where I sign a year contract and can't get out?",
+        opening:
+          "Hey, alright. So just so we're clear up front — is this one of those places where I sign a year contract and can't get out?",
         systemPrompt: `You are role-playing as Marcus, 45, recently divorced, signing up for himself. Your only soft objection is contracts — your last gym locked you into a 24-month deal you couldn't escape and you swore you'd never do that again. You walked in pre-skeptical about contracts but otherwise ready to start.
 
 BEHAVIOR:
@@ -542,7 +545,8 @@ RULES: Stay in character. 1-2 sentences. Direct, slightly cautious speech. Outpu
       {
         id: "tasha-runner",
         name: "Tasha",
-        opening: "Hey, gym looks solid. Quick question before we get into pricing — do you guys have a decent treadmill setup? I'm an ultra runner so I'm in here mostly for cross-training in winter.",
+        opening:
+          "Hey, gym looks solid. Quick question before we get into pricing — do you guys have a decent treadmill setup? I'm an ultra runner so I'm in here mostly for cross-training in winter.",
         systemPrompt: `You are role-playing as Tasha, 26, runs ultra marathons (50-100 mile races). Looking for indoor cross-training for the winter months. You have NO real objection — you just want to confirm the gym has what you need. Money is not an issue. You're already 90% sold; you just need to feel like the rep took your needs seriously.
 
 BEHAVIOR:
@@ -558,12 +562,14 @@ RULES: Stay in character. 1-2 sentences. Confident, athletic speech style. Outpu
 
   medium: {
     label: "Medium",
-    description: "Real objection. Tests the Deaf Ear Close + matching the right tool.",
+    description:
+      "Real objection. Tests the Deaf Ear Close + matching the right tool.",
     scenarios: [
       {
         id: "mike-construction",
         name: "Mike",
-        opening: "Yeah... gym looks fine. Alright, so... what's this gonna cost me?",
+        opening:
+          "Yeah... gym looks fine. Alright, so... what's this gonna cost me?",
         systemPrompt: `You are role-playing as Mike, 38, construction worker, gained 25 lbs in 2 years, doctor told him to start working out. Wife pushed him to come in. Likes the idea but money is tight. Already did the tour — sitting at the desk now.
 
 BEHAVIOR:
@@ -580,7 +586,8 @@ RULES: Stay in character. 1-2 sentences. Real-person speech. Output only what Mi
       {
         id: "daniela-singlemom",
         name: "Daniela",
-        opening: "Hi. Yeah I like the gym. Honestly, I'm interested but I don't get paid till Friday. Can I come back then?",
+        opening:
+          "Hi. Yeah I like the gym. Honestly, I'm interested but I don't get paid till Friday. Can I come back then?",
         systemPrompt: `You are role-playing as Daniela, 34, single mom of two kids. You like the gym and want to join — but you genuinely don't get paid until Friday. Your objection is real: timing, not "let me think." You'd sign up RIGHT NOW if the rep can solve the Friday gap.
 
 BEHAVIOR:
@@ -596,7 +603,8 @@ RULES: Stay in character. 1-2 sentences. Warm but tired. Output only what Daniel
       {
         id: "brandon-comparing",
         name: "Brandon",
-        opening: "Gym looks alright. I'm gonna be honest — I'm checking out a couple places this week. What's the price?",
+        opening:
+          "Gym looks alright. I'm gonna be honest — I'm checking out a couple places this week. What's the price?",
         systemPrompt: `You are role-playing as Brandon, 41, married with 2 kids in sports, mortgage. You're price-conscious and you say so up front: you're shopping multiple gyms. Your real objection is value — does this gym justify the cost over a cheaper alternative.
 
 BEHAVIOR:
@@ -611,7 +619,8 @@ RULES: Stay in character. 1-2 sentences. Direct, business-like. Output only what
       {
         id: "stephanie-quitter",
         name: "Stephanie",
-        opening: "Yeah I like it. Honestly though — I've joined like four gyms in the last few years and I just... stop going after a month. I don't even know if it's worth me signing up again.",
+        opening:
+          "Yeah I like it. Honestly though — I've joined like four gyms in the last few years and I just... stop going after a month. I don't even know if it's worth me signing up again.",
         systemPrompt: `You are role-playing as Stephanie, 28. You've joined and quit multiple gyms. You're at the desk telling the rep this BEFORE they ask. Your objection isn't cost or contracts — it's accountability. You don't trust YOURSELF to keep showing up.
 
 BEHAVIOR:
@@ -633,7 +642,8 @@ RULES: Stay in character. 1-2 sentences. Self-aware, slightly defeated tone but 
       {
         id: "jessica-comparing",
         name: "Jessica",
-        opening: "OK, gym's nice. But before I sit here and listen to a sales pitch — I already toured Planet Fitness and they're $10 a month. So what's this place going to cost?",
+        opening:
+          "OK, gym's nice. But before I sit here and listen to a sales pitch — I already toured Planet Fitness and they're $10 a month. So what's this place going to cost?",
         systemPrompt: `You are role-playing as Jessica, 29, marketing manager. Very price-conscious. You've already toured Planet Fitness ($10/mo) and LA Fitness this week. You are in evaluation mode, NOT in buying mode. You did the tour — sitting at the desk now.
 
 STACKED OBJECTIONS (use in sequence):
@@ -655,7 +665,8 @@ RULES: Stay in character. 1-2 sentences. Push on weak moves; reward strong ones.
       {
         id: "carlos-burned",
         name: "Carlos",
-        opening: "Look, I've tried three gyms in two years. They all started great and went downhill. Why is this one different?",
+        opening:
+          "Look, I've tried three gyms in two years. They all started great and went downhill. Why is this one different?",
         systemPrompt: `You are role-playing as Carlos, 52, has joined and quit 3 gyms in the last 2 years. Deeply skeptical of gym sales. Real objections: trust + price. You're testing the rep before you trust them with your money.
 
 STACKED OBJECTIONS:
@@ -676,7 +687,8 @@ RULES: Stay in character. 1-2 sentences. Older, direct, slightly weary. Output o
       {
         id: "megan-intimidated",
         name: "Megan",
-        opening: "Hi. So... yeah. The gym seems nice. Um. I think I want to talk to my husband first before I commit to anything.",
+        opening:
+          "Hi. So... yeah. The gym seems nice. Um. I think I want to talk to my husband first before I commit to anything.",
         systemPrompt: `You are role-playing as Megan, 31, brand new to fitness. You are TERRIFIED of the gym — you don't know how to use any equipment and you're scared of being judged. You hide this fear under the "I want to talk to my husband first" objection because it's socially acceptable. The husband objection is COVER for the real fear.
 
 THE TRAP: A rep who takes your spouse objection at face value (or even runs the Deaf Ear → "if your husband doesn't join, would you still be interested?") still misses the real issue. You'll say "yeah, I'd still want to" — but the real fear of being a beginner stops you from committing.
@@ -694,7 +706,8 @@ RULES: Stay in character. 1-2 sentences. Visibly nervous speech. Output only wha
       {
         id: "trent-business",
         name: "Trent",
-        opening: "OK gym looks legit. Quick question for you — how long have you been in business at this location, and what's your retention look like? I want to make sure this place is gonna be here next year.",
+        opening:
+          "OK gym looks legit. Quick question for you — how long have you been in business at this location, and what's your retention look like? I want to make sure this place is gonna be here next year.",
         systemPrompt: `You are role-playing as Trent, 38, business owner. You think like a buyer, not a consumer. You ask the rep psychological/business questions to test credibility. You can afford any tier — but you'll only buy from someone who treats you like an equal, not a mark.
 
 YOUR QUESTIONS (use in sequence — don't just dump them):
@@ -722,7 +735,7 @@ function pickScenario(difficulty, recentlySeenIds) {
   const all = bucket.scenarios;
   const seen = new Set((recentlySeenIds || "").split(",").filter(Boolean));
   const fresh = all.filter((s) => !seen.has(s.id));
-  const pool = fresh.length > 0 ? fresh : all;  // if all seen, draw from all
+  const pool = fresh.length > 0 ? fresh : all; // if all seen, draw from all
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -740,9 +753,33 @@ setInterval(
   5 * 60 * 1000,
 );
 
-function startPracticeSession({ difficulty, location_id, recently_seen }) {
+function startPracticeSession({
+  difficulty,
+  location_id,
+  recently_seen,
+  mode,
+  player_id,
+  player_name,
+  forced_scenario_id,
+}) {
   const bucket = PROSPECT_PERSONAS[difficulty] || PROSPECT_PERSONAS.medium;
-  const scenario = pickScenario(difficulty, recently_seen);
+  let scenario;
+  if (forced_scenario_id) {
+    scenario = bucket.scenarios.find((s) => s.id === forced_scenario_id);
+    if (!scenario) {
+      // Try other buckets — game mode may select any difficulty's scenario
+      for (const k of Object.keys(PROSPECT_PERSONAS)) {
+        const found = PROSPECT_PERSONAS[k].scenarios.find(
+          (s) => s.id === forced_scenario_id,
+        );
+        if (found) {
+          scenario = found;
+          break;
+        }
+      }
+    }
+  }
+  if (!scenario) scenario = pickScenario(difficulty, recently_seen);
   const session_id = require("crypto").randomUUID();
   const now = Date.now();
   practiceSessions.set(session_id, {
@@ -750,6 +787,9 @@ function startPracticeSession({ difficulty, location_id, recently_seen }) {
     bucket_label: bucket.label,
     scenario,
     location_id: location_id || null,
+    mode: mode || "practice",
+    player_id: player_id || null,
+    player_name: player_name || null,
     messages: [{ role: "assistant", content: scenario.opening }],
     started_at: now,
     last_active: now,
@@ -764,7 +804,9 @@ function startPracticeSession({ difficulty, location_id, recently_seen }) {
 }
 
 async function chatAsProspect(session_id, rep_message) {
-  console.log(`[Practice] turn for session ${session_id}: rep="${rep_message.slice(0, 60)}..."`);
+  console.log(
+    `[Practice] turn for session ${session_id}: rep="${rep_message.slice(0, 60)}..."`,
+  );
   const session = practiceSessions.get(session_id);
   if (!session) throw new Error("Session not found or expired");
   session.messages.push({ role: "user", content: rep_message });
@@ -795,15 +837,92 @@ async function scorePracticeSession(session_id) {
   const transcript = session.messages
     .map((m) => (m.role === "user" ? "REP: " : "PROSPECT: ") + m.content)
     .join("\n\n");
-  console.log(`[Practice] scoring session ${session_id} (${session.messages.length} messages, ${transcript.length} chars)`);
+  console.log(
+    `[Practice] scoring session ${session_id} (${session.messages.length} messages, ${transcript.length} chars)`,
+  );
   try {
     const sc = await scoreTranscript(transcript);
-    console.log(`[Practice] score complete: ${sc.total_score}/100 closed=${sc.did_close}`);
+    console.log(
+      `[Practice] score complete: ${sc.total_score}/100 closed=${sc.did_close}`,
+    );
     return { scorecard: sc, messages: session.messages.slice() };
   } catch (err) {
-    console.error(`[Practice] scoring failed for session ${session_id}:`, err.message);
+    console.error(
+      `[Practice] scoring failed for session ${session_id}:`,
+      err.message,
+    );
     throw err;
   }
+}
+
+// ─────────── GAME LEVELS ───────────
+// Five-level progression. Pass a level by closing AT LEAST ONE scenario in it
+// with did_close=true and total_score >= 70. Each level unlocks the next.
+const GAME_LEVELS = [
+  {
+    level: 1,
+    name: "Rookie",
+    title: "Welcome to the Floor",
+    description: "Your first prospect just walked in. Master the basics.",
+    color: "#22D3EE",
+    scenarios: ["sarah-newmom"],
+  },
+  {
+    level: 2,
+    name: "Street Smart",
+    title: "Different Kinds of Easy",
+    description: "Not every easy prospect closes the same way. Read the room.",
+    color: "#06B6D4",
+    scenarios: ["marcus-divorced", "tasha-runner"],
+  },
+  {
+    level: 3,
+    name: "Deaf Ear",
+    title: "When 'Let Me Think' Means Cost",
+    description: "Run the diagnostic. Find the real objection. Match the tool.",
+    color: "#0284C7",
+    scenarios: ["mike-construction", "brandon-comparing"],
+  },
+  {
+    level: 4,
+    name: "Negotiator",
+    title: "Creative Closes at Full Price",
+    description:
+      "Payment-timing. Accountability framing. Closing without giving away revenue.",
+    color: "#7C3AED",
+    scenarios: ["daniela-singlemom", "stephanie-quitter"],
+  },
+  {
+    level: 5,
+    name: "Boss",
+    title: "The Toughest Closes",
+    description:
+      "Stacked objections. Skepticism. Intimidation. Business questions. Earn your stripes.",
+    color: "#EC4899",
+    scenarios: [
+      "jessica-comparing",
+      "carlos-burned",
+      "megan-intimidated",
+      "trent-business",
+    ],
+  },
+];
+
+// Flat scenario lookup — given an id, return its persona definition + the level it belongs to.
+function findScenarioById(scenario_id) {
+  for (const k of Object.keys(PROSPECT_PERSONAS)) {
+    const s = PROSPECT_PERSONAS[k].scenarios.find((x) => x.id === scenario_id);
+    if (s) {
+      const lvl = GAME_LEVELS.find((l) => l.scenarios.includes(scenario_id));
+      return {
+        ...s,
+        difficulty: k,
+        bucket_label: PROSPECT_PERSONAS[k].label,
+        level: lvl ? lvl.level : null,
+      };
+    }
+  }
+  return null;
 }
 
 module.exports = {
@@ -815,4 +934,6 @@ module.exports = {
   chatAsProspect,
   getPracticeSession,
   scorePracticeSession,
+  GAME_LEVELS,
+  findScenarioById,
 };

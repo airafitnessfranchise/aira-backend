@@ -22,6 +22,8 @@ const {
   chatAsProspect,
   getPracticeSession,
   scorePracticeSession,
+  GAME_LEVELS,
+  findScenarioById,
 } = require("./ai");
 const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
@@ -1162,10 +1164,20 @@ app.post("/practice/start", async (req, res) => {
     const cookieRaw = req.headers.cookie || "";
     const m = cookieRaw.match(/aira_seen=([^;]+)/);
     const recently_seen = m ? decodeURIComponent(m[1]) : "";
+    // Game-mode params (optional). When mode=game, we lock in a specific scenario_id and
+    // tag the session with player_id/player_name so progress can be queried later.
+    const mode = req.body.mode === "game" ? "game" : "practice";
+    const player_id = req.body.player_id || null;
+    const player_name = req.body.player_name || null;
+    const forced_scenario_id = req.body.scenario_id || null;
     const out = startPracticeSession({
       difficulty,
       location_id,
       recently_seen,
+      mode,
+      player_id,
+      player_name,
+      forced_scenario_id,
     });
     res.json({ ok: true, ...out });
   } catch (err) {
@@ -1220,6 +1232,9 @@ app.post("/practice/end", async (req, res) => {
         difficulty: session.difficulty,
         persona_label: personaLabelForRecord,
         scenario_id: session.scenario.id,
+        player_id: session.player_id || null,
+        player_name: session.player_name || null,
+        mode: session.mode || "practice",
         messages: result.messages,
         scorecard: result.scorecard,
       });
@@ -1250,6 +1265,814 @@ app.post("/practice/end", async (req, res) => {
     console.error("[Practice] end error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ─────────── AIRA FITNESS CLOSING GAME ───────────
+
+app.get("/airafitnessclosinggame/progress", async (req, res) => {
+  try {
+    const player_id = req.query.player_id;
+    if (!player_id)
+      return res.status(400).json({ ok: false, error: "player_id required" });
+    const progress = await db.getPlayerGameProgress(player_id);
+    res.json({ ok: true, progress, levels: GAME_LEVELS });
+  } catch (err) {
+    console.error("[Game] progress error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/airafitnessclosinggame/leaderboard", async (req, res) => {
+  try {
+    const board = await db.getGameLeaderboard(25);
+    res.json({ ok: true, leaderboard: board });
+  } catch (err) {
+    console.error("[Game] leaderboard error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/airafitnessclosinggame/scenario/:id", (req, res) => {
+  const sc = findScenarioById(req.params.id);
+  if (!sc)
+    return res.status(404).json({ ok: false, error: "Scenario not found" });
+  res.json({
+    ok: true,
+    scenario: {
+      id: sc.id,
+      name: sc.name,
+      difficulty: sc.difficulty,
+      level: sc.level,
+      opening_preview: sc.opening,
+    },
+  });
+});
+
+app.get("/airafitnessclosinggame", (req, res) => {
+  const locOptions = ALL_LOCATIONS.map(
+    (l) => `<option value="${l.location_id}">${l.franchise_name}</option>`,
+  ).join("");
+  // Send the full level + scenario metadata so the client can render the level map.
+  const levelData = GAME_LEVELS.map((lvl) => ({
+    level: lvl.level,
+    name: lvl.name,
+    title: lvl.title,
+    description: lvl.description,
+    color: lvl.color,
+    scenarios: lvl.scenarios
+      .map((sid) => {
+        const sc = findScenarioById(sid);
+        return sc
+          ? {
+              id: sc.id,
+              name: sc.name,
+              difficulty: sc.difficulty,
+              opening: sc.opening,
+            }
+          : null;
+      })
+      .filter(Boolean),
+  }));
+
+  res.send(`<!DOCTYPE html><html><head><title>Aira Fitness Closing Game</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;
+  background:#05080F;
+  color:#E5E7EB;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  position:relative;
+  min-height:100vh;
+}
+/* Animated aurora background */
+body::before{
+  content:'';
+  position:fixed;
+  inset:-50%;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(0,174,239,0.20), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 30%, rgba(124,58,237,0.16), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(236,72,153,0.12), transparent 60%);
+  filter:blur(40px);
+  z-index:0;
+  animation:auroraShift 20s ease-in-out infinite alternate;
+}
+@keyframes auroraShift{
+  0%{transform:translate(0,0) rotate(0);}
+  100%{transform:translate(-3%,3%) rotate(2deg);}
+}
+body::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 47% 73%, rgba(0,174,239,0.5), transparent),
+    radial-gradient(1px 1px at 82% 27%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 33% 88%, rgba(124,58,237,0.4), transparent),
+    radial-gradient(1px 1px at 67% 52%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(2px 2px at 15% 65%, rgba(0,174,239,0.6), transparent),
+    radial-gradient(1px 1px at 89% 91%, rgba(255,255,255,0.5), transparent);
+  background-size:100% 100%;
+  z-index:0;
+  pointer-events:none;
+  opacity:0.7;
+}
+
+.app{position:relative;z-index:1;min-height:100vh;padding:24px;display:flex;flex-direction:column;}
+.shell{max-width:1100px;width:100%;margin:0 auto;flex:1;display:flex;flex-direction:column;}
+
+/* HEADER */
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:36px;padding-top:8px;}
+.logo{font-size:18px;font-weight:900;letter-spacing:.2em;}
+.logo .b{color:#00AEEF;text-shadow:0 0 24px rgba(0,174,239,.55);}
+.logo .w{color:#fff;}
+.logo .game{display:inline-block;margin-left:14px;padding:4px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border-radius:999px;font-size:11px;letter-spacing:.16em;text-shadow:none;font-weight:800;}
+.player-pill{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;font-size:12px;color:#9CA3AF;}
+.player-pill .xp{color:#00AEEF;font-weight:900;}
+.player-pill .name{color:#fff;font-weight:700;}
+
+/* SPLASH SCREEN */
+.splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;}
+.splash h1{
+  font-size:clamp(40px,7vw,80px);
+  font-weight:900;
+  line-height:1;
+  letter-spacing:-.02em;
+  background:linear-gradient(120deg,#00AEEF 0%,#7C3AED 50%,#EC4899 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  margin-bottom:18px;
+  filter:drop-shadow(0 4px 28px rgba(0,174,239,.3));
+  animation:slideUp .8s ease-out;
+}
+.splash .tag{
+  font-size:18px;color:#9CA3AF;margin-bottom:40px;max-width:560px;line-height:1.6;
+  animation:slideUp 1s ease-out;
+}
+.splash .tag b{color:#fff;font-weight:600;}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+.start-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  padding:32px;
+  width:100%;
+  max-width:440px;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  box-shadow:0 8px 40px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:slideUp 1.2s ease-out;
+}
+.start-card label{display:block;margin-bottom:18px;text-align:left;}
+.start-card label span{display:block;font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.14em;font-weight:800;margin-bottom:8px;}
+.start-card input,.start-card select{
+  width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);border-radius:10px;
+  color:#fff;font-size:15px;font-family:inherit;
+  transition:border-color .2s,background .2s;
+}
+.start-card input:focus,.start-card select:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.06);}
+.start-card select option{background:#0A0F1E;color:#fff;}
+.btn-primary{
+  width:100%;padding:16px 24px;
+  background:linear-gradient(135deg,#00AEEF 0%,#7C3AED 100%);
+  border:0;color:#fff;border-radius:12px;
+  font-size:15px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  cursor:pointer;
+  box-shadow:0 8px 24px rgba(0,174,239,.35);
+  transition:transform .15s,box-shadow .15s,filter .15s;
+  font-family:inherit;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,174,239,.45);filter:brightness(1.08);}
+.btn-primary:active{transform:translateY(0);}
+.btn-primary:disabled{opacity:.5;cursor:wait;}
+
+/* LEVEL MAP */
+.map-head{margin-bottom:32px;}
+.map-head h2{font-size:36px;font-weight:900;letter-spacing:-.01em;margin-bottom:6px;}
+.map-head p{color:#9CA3AF;font-size:14px;}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:36px;}
+.stat-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;
+  padding:14px 18px;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.stat-label{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
+.stat-num{font-size:28px;font-weight:900;line-height:1.2;letter-spacing:-.02em;margin-top:4px;}
+.stat-num.xp{background:linear-gradient(120deg,#00AEEF,#EC4899);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+.level-grid{display:flex;flex-direction:column;gap:18px;margin-bottom:32px;}
+.level-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  padding:24px 28px;
+  display:flex;align-items:center;gap:24px;
+  position:relative;
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  transition:transform .25s,border-color .25s,box-shadow .25s;
+}
+.level-card.unlocked{cursor:pointer;}
+.level-card.unlocked:hover{
+  transform:translateY(-3px);
+  border-color:rgba(255,255,255,0.16);
+  box-shadow:0 12px 32px rgba(0,0,0,.35);
+}
+.level-card.locked{opacity:.45;filter:grayscale(0.6);}
+.level-card.completed{
+  border-color:rgba(34,211,238,0.35);
+  box-shadow:0 0 0 1px rgba(34,211,238,0.15),0 8px 28px rgba(34,211,238,0.08);
+}
+.level-card.completed::before{
+  content:'';position:absolute;inset:-1px;border-radius:18px;
+  background:linear-gradient(135deg,rgba(34,211,238,0.4),transparent 50%,rgba(124,58,237,0.3));
+  z-index:-1;filter:blur(8px);
+  opacity:.6;
+}
+
+.level-num{
+  width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:900;flex-shrink:0;position:relative;
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);
+  transition:all .25s;
+}
+.level-card.unlocked .level-num{
+  background:linear-gradient(135deg,var(--lvl-color,#00AEEF),rgba(0,0,0,.2));
+  border-color:rgba(255,255,255,0.18);
+  box-shadow:0 0 28px var(--lvl-glow,rgba(0,174,239,.3)),inset 0 1px 0 rgba(255,255,255,0.2);
+  color:#fff;
+}
+.level-card.completed .level-num::after{
+  content:'';position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;
+  background:#22D3EE;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 12px rgba(34,211,238,.6);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230A0F1E'><path d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/></svg>");
+  background-position:center;background-repeat:no-repeat;background-size:18px;
+}
+.level-card.locked .level-num::after{
+  content:'';position:absolute;inset:0;border-radius:18px;
+  background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E5E7EB' opacity='.7'><path d='M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z'/></svg>");
+  background-position:center;background-repeat:no-repeat;background-size:24px;
+}
+.level-info{flex:1;min-width:0;}
+.level-name{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--lvl-color,#00AEEF);margin-bottom:4px;}
+.level-card.locked .level-name{color:#6B7280;}
+.level-title{font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;letter-spacing:-.01em;}
+.level-card.locked .level-title{color:#6B7280;}
+.level-desc{font-size:13px;color:#9CA3AF;line-height:1.5;}
+.level-meta{font-size:11px;color:#6B7280;margin-top:8px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;}
+.level-progress{font-size:12px;color:#22D3EE;font-weight:700;margin-top:6px;}
+
+.level-arrow{
+  font-size:24px;color:rgba(255,255,255,0.3);flex-shrink:0;
+  transition:transform .25s,color .25s;
+}
+.level-card.unlocked:hover .level-arrow{color:#fff;transform:translateX(4px);}
+
+/* SCENARIO PICKER */
+.scenarios{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+.scenario-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  padding:20px;cursor:pointer;
+  transition:transform .2s,border-color .2s;
+  position:relative;
+}
+.scenario-card:hover{transform:translateY(-3px);border-color:rgba(0,174,239,0.4);}
+.scenario-card.passed{border-color:rgba(34,211,238,0.4);}
+.scenario-card.passed::before{
+  content:'PASSED';position:absolute;top:14px;right:14px;
+  font-size:10px;font-weight:800;letter-spacing:.12em;
+  padding:3px 8px;background:rgba(34,211,238,0.15);color:#22D3EE;border-radius:999px;
+}
+.persona-avatar{
+  width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,var(--lvl-color,#00AEEF),rgba(124,58,237,0.6));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:18px;color:#fff;margin-bottom:14px;
+  box-shadow:0 4px 16px rgba(0,174,239,0.25);
+}
+.scenario-name{font-size:18px;font-weight:800;color:#fff;margin-bottom:4px;}
+.scenario-tag{font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;}
+.scenario-preview{font-size:13px;color:#9CA3AF;line-height:1.5;font-style:italic;}
+.scenario-cta{font-size:11px;font-weight:800;color:#00AEEF;margin-top:14px;text-transform:uppercase;letter-spacing:.12em;}
+
+.back-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:0;color:#9CA3AF;font-size:13px;cursor:pointer;
+  padding:8px 0;margin-bottom:20px;font-family:inherit;font-weight:600;
+}
+.back-btn:hover{color:#fff;}
+
+/* CHAT */
+.chat-frame{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:480px;
+  overflow:hidden;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.chat-header{padding:16px 22px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;}
+.chat-persona-block{display:flex;align-items:center;gap:12px;}
+.chat-persona-avatar{
+  width:40px;height:40px;border-radius:50%;
+  background:linear-gradient(135deg,#00AEEF,rgba(124,58,237,0.6));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:15px;color:#fff;flex-shrink:0;
+}
+.chat-persona-meta{display:flex;flex-direction:column;}
+.chat-persona-name{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.01em;}
+.chat-persona-sub{font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;font-weight:700;}
+.chat-end{
+  padding:8px 16px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);
+  color:#FCA5A5;border-radius:999px;font-size:11px;font-weight:800;
+  letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;
+  transition:background .2s;
+}
+.chat-end:hover{background:rgba(220,38,38,0.18);}
+
+.chat-body{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:10px;}
+.bubble{max-width:78%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.55;animation:fadeIn .25s ease-out;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.bubble.prospect{background:rgba(255,255,255,0.06);color:#E5E7EB;align-self:flex-start;border-bottom-left-radius:6px;}
+.bubble.rep{background:linear-gradient(135deg,#0284C7,#00AEEF);color:#fff;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 16px rgba(0,174,239,0.25);}
+.bubble.thinking{background:rgba(255,255,255,0.04);color:#6B7280;align-self:flex-start;font-style:italic;border-bottom-left-radius:6px;}
+
+.chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:10px;align-items:flex-end;}
+.chat-input textarea{
+  flex:1;padding:12px 16px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;color:#fff;font-size:14px;font-family:inherit;resize:none;
+  min-height:46px;max-height:140px;line-height:1.4;transition:border-color .2s;
+}
+.chat-input textarea:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.04);}
+.chat-input button{
+  padding:12px 22px;background:linear-gradient(135deg,#00AEEF,#7C3AED);
+  border:0;color:#fff;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;
+  font-family:inherit;letter-spacing:.04em;text-transform:uppercase;
+  transition:transform .15s,filter .15s;flex-shrink:0;
+}
+.chat-input button:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.chat-input button:disabled{opacity:.5;cursor:wait;transform:none;}
+
+/* SCORE SCREEN */
+.score-screen{padding:24px 0;}
+.celebration{
+  text-align:center;padding:40px 24px;
+  background:linear-gradient(135deg,rgba(0,174,239,0.08),rgba(124,58,237,0.08));
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:24px;margin-bottom:24px;position:relative;overflow:hidden;
+  animation:slideUp .6s ease-out;
+}
+.celebration h2{
+  font-size:clamp(34px,5vw,56px);font-weight:900;line-height:1;
+  background:linear-gradient(120deg,#22D3EE,#7C3AED,#EC4899);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  letter-spacing:-.02em;margin-bottom:14px;
+  filter:drop-shadow(0 4px 24px rgba(0,174,239,.4));
+}
+.celebration .sub{font-size:16px;color:#9CA3AF;margin-bottom:24px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.celebration .score-display{
+  display:inline-flex;align-items:baseline;gap:6px;font-weight:900;
+  font-size:72px;letter-spacing:-.03em;
+}
+.celebration .score-display .of{font-size:24px;color:#9CA3AF;font-weight:700;}
+.celebration.win .score-display{color:#22D3EE;text-shadow:0 0 32px rgba(34,211,238,0.5);}
+.celebration.fail .score-display{color:#EC4899;}
+
+.celebration.win h2::after{content:' 🎉';}
+
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden;}
+.confetti span{
+  position:absolute;width:8px;height:14px;border-radius:2px;top:-20px;
+  animation:confettiFall var(--dur,3s) ease-in forwards;
+}
+@keyframes confettiFall{
+  0%{transform:translate(0,0) rotate(0);opacity:1;}
+  100%{transform:translate(var(--dx,0),100vh) rotate(720deg);opacity:0;}
+}
+
+.scorecard-block{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;padding:24px;margin-bottom:16px;
+}
+.section-eyebrow{font-size:10px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;}
+.cat-row{margin-top:14px;}
+.cat-row-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.cat-label{font-size:13px;font-weight:700;color:#fff;}
+.cat-score{font-size:14px;font-weight:800;}
+.cat-bar{background:rgba(255,255,255,0.08);border-radius:9999px;height:6px;overflow:hidden;}
+.cat-bar-fill{height:6px;border-radius:9999px;transition:width .8s cubic-bezier(.2,.7,.3,1);}
+.cat-explainer{font-size:12px;color:#9CA3AF;line-height:1.55;margin-top:6px;}
+.coaching{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-left:3px solid #00AEEF;
+  border-radius:10px;padding:22px 24px;margin-bottom:16px;
+}
+.coaching .head{font-size:11px;font-weight:800;color:#22D3EE;text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;}
+.coaching .body{font-size:14px;color:#E5E7EB;line-height:1.7;}
+.coaching .body p{margin-top:12px;}
+.coaching .body p:first-child{margin-top:0;}
+
+.btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+.btn-secondary{
+  padding:14px 24px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+  color:#fff;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;
+  font-family:inherit;letter-spacing:.04em;
+  transition:background .15s;
+}
+.btn-secondary:hover{background:rgba(255,255,255,0.1);}
+
+.hidden{display:none !important;}
+.spinner-row{display:flex;align-items:center;gap:12px;margin-top:14px;justify-content:center;}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.1);border-top-color:#00AEEF;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+@media(max-width:640px){
+  .level-card{padding:18px;gap:16px;}
+  .level-num{width:52px;height:52px;font-size:22px;}
+  .level-title{font-size:17px;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+}
+</style></head><body>
+
+<div class="app">
+  <div class="shell">
+
+    <div class="header">
+      <div class="logo"><span class="b">AIRA</span><span class="w">FITNESS</span><span class="game">CLOSING GAME</span></div>
+      <div id="player-pill" class="player-pill hidden">
+        <span class="name" id="pp-name">Player</span> · <span class="xp"><span id="pp-xp">0</span> XP</span>
+      </div>
+    </div>
+
+    <!-- SPLASH -->
+    <div id="splash" class="splash">
+      <h1>Become an Expert Closer</h1>
+      <p class="tag">Five levels. Eleven prospects. Every objection you'll hear on the floor — simulated, scored, and coached. Beat each level to unlock the next. <b>Let's see how good you really are.</b></p>
+      <div class="start-card">
+        <label><span>Your Name (display only)</span><input id="player-name" placeholder="e.g. Alex" maxlength="32" /></label>
+        <label><span>Your Gym</span><select id="location"><option value="">— Select your gym —</option>${locOptions}</select></label>
+        <button class="btn-primary" id="enter-btn">Enter the Game →</button>
+      </div>
+    </div>
+
+    <!-- LEVEL MAP -->
+    <div id="map" class="hidden">
+      <div class="map-head">
+        <h2>Your Closer Path</h2>
+        <p>Pass each level to unlock the next. Score 70+ and close the sale to clear a scenario.</p>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total XP</div><div class="stat-num xp" id="stat-xp">0</div></div>
+        <div class="stat-card"><div class="stat-label">Closes</div><div class="stat-num" id="stat-closes">0</div></div>
+        <div class="stat-card"><div class="stat-label">Attempts</div><div class="stat-num" id="stat-attempts">0</div></div>
+        <div class="stat-card"><div class="stat-label">Highest Level</div><div class="stat-num" id="stat-level">1</div></div>
+      </div>
+      <div class="level-grid" id="level-grid"></div>
+    </div>
+
+    <!-- SCENARIO PICKER -->
+    <div id="picker" class="hidden">
+      <button class="back-btn" onclick="showMap()">← Back to levels</button>
+      <div class="map-head">
+        <h2 id="picker-title">Pick your prospect</h2>
+        <p id="picker-desc"></p>
+      </div>
+      <div class="scenarios" id="scenarios"></div>
+    </div>
+
+    <!-- CHAT -->
+    <div id="chat" class="chat-frame hidden">
+      <div class="chat-header">
+        <div class="chat-persona-block">
+          <div class="chat-persona-avatar" id="chat-avatar">?</div>
+          <div class="chat-persona-meta">
+            <div class="chat-persona-name" id="chat-name">—</div>
+            <div class="chat-persona-sub" id="chat-tag">Practicing</div>
+          </div>
+        </div>
+        <button class="chat-end" id="end-btn">End &amp; Score</button>
+      </div>
+      <div class="chat-body" id="messages"></div>
+      <div class="chat-input">
+        <textarea id="rep-input" placeholder="What do you say to the prospect?" rows="1"></textarea>
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+
+    <!-- SCORE -->
+    <div id="score" class="score-screen hidden"></div>
+
+  </div>
+</div>
+
+<script>
+const LEVELS = ${JSON.stringify(levelData)};
+const $ = (id) => document.getElementById(id);
+let PLAYER = { id: null, name: null, location_id: null, xp: 0, closes: 0, attempts: 0, scenarios_passed: [], highest_level: 1 };
+let SESSION_ID = null;
+let CURRENT_SCENARIO = null;
+let CURRENT_LEVEL = null;
+
+// ─── identity / progress ───
+function ensurePlayerId(){
+  let id = (document.cookie.match(/aira_player_id=([^;]+)/)||[])[1];
+  if (!id){
+    id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('p_'+Math.random().toString(36).slice(2)+Date.now());
+    document.cookie = 'aira_player_id=' + encodeURIComponent(id) + '; path=/; max-age=15552000; SameSite=Lax';
+  }
+  return decodeURIComponent(id);
+}
+function loadCachedProfile(){
+  const n = (document.cookie.match(/aira_player_name=([^;]+)/)||[])[1];
+  const l = (document.cookie.match(/aira_player_location=([^;]+)/)||[])[1];
+  if (n) PLAYER.name = decodeURIComponent(n);
+  if (l) PLAYER.location_id = decodeURIComponent(l);
+}
+function saveProfile(){
+  if (PLAYER.name) document.cookie = 'aira_player_name=' + encodeURIComponent(PLAYER.name) + '; path=/; max-age=15552000; SameSite=Lax';
+  if (PLAYER.location_id) document.cookie = 'aira_player_location=' + encodeURIComponent(PLAYER.location_id) + '; path=/; max-age=15552000; SameSite=Lax';
+}
+
+async function fetchProgress(){
+  try {
+    const r = await fetch('/airafitnessclosinggame/progress?player_id=' + encodeURIComponent(PLAYER.id));
+    const d = await r.json();
+    if (!d.ok) return;
+    PLAYER.xp = d.progress.total_xp;
+    PLAYER.closes = d.progress.closes_total;
+    PLAYER.attempts = d.progress.attempts_total;
+    PLAYER.scenarios_passed = (d.progress.per_scenario || []).filter(s => s.passed).map(s => s.scenario_id);
+    if (d.progress.player_name && !PLAYER.name) PLAYER.name = d.progress.player_name;
+    PLAYER.highest_level = computeHighestUnlocked();
+    refreshHeader();
+  } catch (e) { console.error('progress fetch failed', e); }
+}
+
+function computeHighestUnlocked(){
+  // Level N is unlocked if level N-1 had at least one scenario passed (or if N=1 — always unlocked)
+  let highest = 1;
+  for (let i=0;i<LEVELS.length;i++){
+    const lvl = LEVELS[i];
+    const passedAny = lvl.scenarios.some(s => PLAYER.scenarios_passed.includes(s.id));
+    if (passedAny && i+1 < LEVELS.length) highest = Math.max(highest, i+2);
+  }
+  return highest;
+}
+
+function refreshHeader(){
+  $('player-pill').classList.remove('hidden');
+  $('pp-name').textContent = PLAYER.name || 'Player';
+  $('pp-xp').textContent = PLAYER.xp;
+  $('stat-xp').textContent = PLAYER.xp;
+  $('stat-closes').textContent = PLAYER.closes;
+  $('stat-attempts').textContent = PLAYER.attempts;
+  $('stat-level').textContent = PLAYER.highest_level;
+}
+
+// ─── splash ───
+$('enter-btn').onclick = async () => {
+  const name = $('player-name').value.trim();
+  const loc = $('location').value;
+  if (!loc) { alert('Pick your gym to continue'); return; }
+  PLAYER.id = ensurePlayerId();
+  PLAYER.name = name || 'Player';
+  PLAYER.location_id = loc;
+  saveProfile();
+  await fetchProgress();
+  showMap();
+};
+
+// ─── level map ───
+function showMap(){
+  $('splash').classList.add('hidden');
+  $('picker').classList.add('hidden');
+  $('chat').classList.add('hidden');
+  $('score').classList.add('hidden');
+  $('map').classList.remove('hidden');
+  renderLevels();
+}
+function renderLevels(){
+  const grid = $('level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lvl, idx) => {
+    const passed = lvl.scenarios.filter(s => PLAYER.scenarios_passed.includes(s.id)).length;
+    const total = lvl.scenarios.length;
+    const unlocked = idx === 0 || LEVELS[idx-1].scenarios.some(s => PLAYER.scenarios_passed.includes(s.id));
+    const completed = passed >= 1;
+    const card = document.createElement('div');
+    card.className = 'level-card ' + (unlocked ? 'unlocked ' : 'locked ') + (completed ? 'completed' : '');
+    card.style.setProperty('--lvl-color', lvl.color);
+    card.style.setProperty('--lvl-glow', lvl.color + '55');
+    card.innerHTML =
+      '<div class="level-num">' + lvl.level + '</div>' +
+      '<div class="level-info">' +
+        '<div class="level-name">Level ' + lvl.level + ' · ' + lvl.name + '</div>' +
+        '<div class="level-title">' + lvl.title + '</div>' +
+        '<div class="level-desc">' + lvl.description + '</div>' +
+        '<div class="level-progress">' + passed + ' / ' + total + ' scenarios cleared' + (completed ? ' · level passed' : '') + '</div>' +
+      '</div>' +
+      '<div class="level-arrow">→</div>';
+    if (unlocked) card.onclick = () => showPicker(lvl);
+    grid.appendChild(card);
+  });
+}
+
+// ─── scenario picker ───
+function showPicker(lvl){
+  CURRENT_LEVEL = lvl;
+  $('map').classList.add('hidden');
+  $('picker').classList.remove('hidden');
+  $('picker-title').textContent = 'Level ' + lvl.level + ' — ' + lvl.title;
+  $('picker-desc').textContent = lvl.description;
+  const cont = $('scenarios');
+  cont.innerHTML = '';
+  lvl.scenarios.forEach(sc => {
+    const passed = PLAYER.scenarios_passed.includes(sc.id);
+    const card = document.createElement('div');
+    card.className = 'scenario-card' + (passed ? ' passed' : '');
+    card.style.setProperty('--lvl-color', lvl.color);
+    card.innerHTML =
+      '<div class="persona-avatar" style="background:linear-gradient(135deg,' + lvl.color + ',rgba(124,58,237,0.6));">' + sc.name[0] + '</div>' +
+      '<div class="scenario-name">' + sc.name + '</div>' +
+      '<div class="scenario-tag">' + sc.difficulty.toUpperCase() + '</div>' +
+      '<div class="scenario-preview">"' + (sc.opening.length > 130 ? sc.opening.slice(0,130)+'…' : sc.opening) + '"</div>' +
+      '<div class="scenario-cta">' + (passed ? 'Try Again →' : 'Start Consult →') + '</div>';
+    card.onclick = () => startSession(sc, lvl);
+    cont.appendChild(card);
+  });
+}
+
+// ─── chat session ───
+async function startSession(sc, lvl){
+  CURRENT_SCENARIO = sc;
+  $('picker').classList.add('hidden');
+  $('chat').classList.remove('hidden');
+  $('messages').innerHTML = '';
+  $('chat-name').textContent = sc.name;
+  $('chat-tag').textContent = lvl.name + ' · Level ' + lvl.level;
+  $('chat-avatar').textContent = sc.name[0];
+  $('chat-avatar').style.background = 'linear-gradient(135deg,' + lvl.color + ',rgba(124,58,237,0.6))';
+
+  const r = await postJson('/practice/start', {
+    difficulty: sc.difficulty,
+    location_id: PLAYER.location_id,
+    mode: 'game',
+    player_id: PLAYER.id,
+    player_name: PLAYER.name,
+    scenario_id: sc.id,
+  });
+  if (!r.ok) { alert('Error: ' + r.error); return; }
+  SESSION_ID = r.session_id;
+  bubble('prospect', r.opening);
+  $('rep-input').focus();
+}
+
+function bubble(role, text){
+  const div = document.createElement('div');
+  div.className = 'bubble ' + role;
+  div.textContent = text;
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+  return div;
+}
+async function postJson(url, body){
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return r.json();
+}
+const repInput = $('rep-input');
+repInput.addEventListener('input', () => { repInput.style.height='auto'; repInput.style.height=Math.min(repInput.scrollHeight,140)+'px'; });
+repInput.addEventListener('keydown', (e) => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); $('send-btn').click(); }});
+$('send-btn').onclick = async () => {
+  const msg = repInput.value.trim(); if (!msg) return;
+  bubble('rep', msg); repInput.value=''; repInput.style.height='auto';
+  $('send-btn').disabled = true;
+  const thinking = bubble('thinking', 'thinking…');
+  const r = await postJson('/practice/turn', { session_id: SESSION_ID, message: msg });
+  thinking.remove();
+  $('send-btn').disabled = false;
+  if (!r.ok){ bubble('prospect', '[error: '+r.error+']'); return; }
+  bubble('prospect', r.reply);
+  repInput.focus();
+};
+
+$('end-btn').onclick = async () => {
+  if (!confirm('End the consult and get scored?')) return;
+  $('end-btn').disabled = true;
+  $('chat').classList.add('hidden');
+  $('score').classList.remove('hidden');
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
+  try {
+    const r = await postJson('/practice/end', { session_id: SESSION_ID });
+    if (!r.ok){
+      $('score').innerHTML = '<div class="celebration fail"><h2>Hmm</h2><p class="sub">'+r.error+'</p><button class="btn-secondary" onclick="showMap()">Back to Levels</button></div>';
+      return;
+    }
+    await fetchProgress();
+    renderResult(r.scorecard, r.messages);
+  } catch (err) {
+    $('score').innerHTML = '<div class="celebration fail"><h2>Connection Error</h2><p class="sub">Couldn\\'t reach the scorer. '+(err.message||err)+'</p><button class="btn-secondary" onclick="$(\\'end-btn\\').click()">Try Again</button></div>';
+  }
+};
+
+function colorFor(score, max){ const p=(score/max)*100; return p>=70?'#22D3EE':p>=50?'#0284C7':'#EC4899'; }
+
+function renderResult(s, messages){
+  const total = s.total_score || 0;
+  const closed = s.did_close === true;
+  const passed = closed && total >= 70;
+  const win = passed;
+
+  if (win) launchConfetti();
+
+  const headline = win
+    ? (total >= 90 ? 'PERFECT CLOSE' : 'LEVEL CLEARED')
+    : (closed ? 'CLOSED — BUT NOT QUITE' : 'PROSPECT WALKED');
+  const sub = win
+    ? 'You earned ' + total + ' XP. The next level is unlocked.'
+    : (closed ? 'You closed at ' + total + ' — passing requires 70+ AND a closed sale.' : 'No sale today. The script knows where the gap was — read the coaching below.');
+
+  const cats = [
+    ['Sit-Down Presentation', s.sitdown_score||0, s.sitdown_score_explainer],
+    ['Objection Handling', s.objection_score||0, s.objection_score_explainer],
+    ['Language & Psychology', s.language_score||0, s.language_score_explainer],
+    ['Close Execution', s.close_score||0, s.close_score_explainer],
+  ];
+  const catHtml = cats.map(([l,sc,e]) => {
+    const c = colorFor(sc,25); const p=(sc/25)*100;
+    return '<div class="cat-row"><div class="cat-row-head"><div class="cat-label">'+l+'</div><div class="cat-score" style="color:'+c+';">'+sc+'<span style="color:#6B7280;font-weight:600;"> / 25</span></div></div><div class="cat-bar"><div class="cat-bar-fill" style="background:'+c+';width:'+p+'%;"></div></div>'+(e?'<div class="cat-explainer">'+e+'</div>':'')+'</div>';
+  }).join('');
+
+  const coaching = (s.overall_coaching || s.coaching_note || '').trim();
+  const coachHtml = coaching ? '<div class="coaching"><div class="head">Coaching Notes</div><div class="body"><p>'+coaching.replace(/\\n\\n+/g,'</p><p>').replace(/\\n/g,' ')+'</p></div></div>' : '';
+
+  const convoHtml = (messages && messages.length) ? '<div class="scorecard-block"><div class="section-eyebrow">The Conversation</div>' + messages.map(m=>{
+    const isRep = m.role==='user';
+    const lblColor = isRep?'#00AEEF':'#9CA3AF';
+    const bg = isRep?'rgba(0,174,239,0.06)':'rgba(255,255,255,0.04)';
+    const border = isRep?'rgba(0,174,239,0.2)':'rgba(255,255,255,0.08)';
+    const safe = String(m.content||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return '<div style="background:'+bg+';border:1px solid '+border+';border-radius:8px;padding:10px 14px;margin-bottom:8px;"><div style="font-size:10px;font-weight:800;letter-spacing:.14em;color:'+lblColor+';margin-bottom:4px;">'+(isRep?'YOU SAID':'PROSPECT SAID')+'</div><div style="font-size:13.5px;color:#E5E7EB;line-height:1.55;">'+safe+'</div></div>';
+  }).join('') + '</div>' : '';
+
+  const nextLevel = win && CURRENT_LEVEL && CURRENT_LEVEL.level < LEVELS.length ? LEVELS[CURRENT_LEVEL.level] : null;
+  const nextBtn = nextLevel ? '<button class="btn-primary" onclick="showPicker(LEVELS['+(nextLevel.level-1)+'])">Next: Level '+nextLevel.level+' — '+nextLevel.name+' →</button>' : '';
+  const retryBtn = '<button class="btn-secondary" onclick="showPicker(LEVELS['+(CURRENT_LEVEL.level-1)+'])">Try Again</button>';
+  const mapBtn = '<button class="btn-secondary" onclick="showMap()">Back to Levels</button>';
+
+  $('score').innerHTML =
+    '<div class="celebration ' + (win?'win':'fail') + '">' +
+      '<h2>' + headline + '</h2>' +
+      '<p class="sub">' + sub + '</p>' +
+      '<div class="score-display">' + total + '<span class="of">/ 100</span></div>' +
+    '</div>' +
+    '<div class="scorecard-block"><div class="section-eyebrow">Score Breakdown</div>' + catHtml + '</div>' +
+    coachHtml +
+    convoHtml +
+    '<div class="btn-row">' + nextBtn + retryBtn + mapBtn + '</div>';
+}
+
+function launchConfetti(){
+  const colors = ['#00AEEF','#22D3EE','#7C3AED','#EC4899','#FBBF24','#fff'];
+  const wrap = document.createElement('div');
+  wrap.className = 'confetti';
+  for (let i=0;i<80;i++){
+    const s = document.createElement('span');
+    s.style.left = (Math.random()*100)+'%';
+    s.style.background = colors[Math.floor(Math.random()*colors.length)];
+    s.style.setProperty('--dx', ((Math.random()-0.5)*240)+'px');
+    s.style.setProperty('--dur', (2.6+Math.random()*1.4)+'s');
+    s.style.animationDelay = (Math.random()*0.4)+'s';
+    wrap.appendChild(s);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(()=>wrap.remove(), 5000);
+}
+
+// ─── boot ───
+loadCachedProfile();
+PLAYER.id = ensurePlayerId();
+if (PLAYER.name && PLAYER.location_id){
+  $('player-name').value = PLAYER.name;
+  $('location').value = PLAYER.location_id;
+  fetchProgress().then(()=>{
+    if (PLAYER.attempts > 0) showMap(); // returning player goes straight in
+  });
+}
+</script>
+</body></html>`);
 });
 
 app.get("/practice", (req, res) => {
