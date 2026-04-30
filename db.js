@@ -225,6 +225,14 @@ async function getAllScorecards() {
   return rows;
 }
 
+async function getScorecardHistory(recording_id) {
+  const { rows } = await pool.query(
+    "SELECT * FROM scorecards WHERE recording_id = $1 ORDER BY created_at ASC",
+    [recording_id],
+  );
+  return rows;
+}
+
 module.exports = {
   initDb,
   createRecording,
@@ -235,5 +243,6 @@ module.exports = {
   findAndReapStuckRecordings,
   createScorecard,
   getScorecardByRecording,
+  getScorecardHistory,
   getAllScorecards,
 };

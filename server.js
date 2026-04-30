@@ -316,8 +316,19 @@ app.get("/admin", async (req, res) => {
     scorecards.forEach((s) => { scorecardMap[s.recording_id] = s; });
     const connectedTablets = Array.from(tabletConnections.keys());
 
-    // ─── Analytics: KPIs + per-category averages + recurring coaching themes ───
-    const scored = scorecards;  // every row in scorecards is already scored
+    // ─── Analytics ───
+    // Every scorecard insert is preserved in the DB forever (no deletes anywhere — historical
+    // re-scores stay around so we can use them for training, flashcards, regression testing).
+    // For LIVE dashboard math we want one row per recording (the most recent), so rescores
+    // don't double-count toward avg score / themes / leaderboard.
+    const latestByRec = new Map();
+    for (const sc of scorecards) {
+      const prev = latestByRec.get(sc.recording_id);
+      if (!prev || new Date(sc.created_at) > new Date(prev.created_at)) latestByRec.set(sc.recording_id, sc);
+    }
+    const scored = Array.from(latestByRec.values());
+    const historicalScorecardCount = scorecards.length;  // includes every rescore — never lost
+
     const totalCloses = scored.filter((s) => s.did_close === true).length;
     const closeRate = scored.length ? Math.round((totalCloses / scored.length) * 100) : 0;
     const avgTotal = scored.length ? Math.round(scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length) : 0;
@@ -327,8 +338,83 @@ app.get("/admin", async (req, res) => {
       { label: "Objection Handling", avg: avgCat("objection_score"), key: "objection_score" },
       { label: "Language & Psychology", avg: avgCat("language_score"), key: "language_score" },
       { label: "Close Execution", avg: avgCat("close_score"), key: "close_score" },
-    ].sort((a, b) => a.avg - b.avg);  // weakest first
-    const activeLocations = new Set(recordings.map((r) => r.location_id)).size;
+    ].sort((a, b) => a.avg - b.avg);
+
+    // ─── 30-day daily series (for sparklines) ───
+    // Pair each latest scorecard with its recording date.
+    const recById = new Map(recordings.map((r) => [r.recording_id, r]));
+    const todayMs = Date.now();
+    const DAY_MS = 86400000;
+    const dailyScores = Array.from({ length: 30 }, () => []);
+    const dailyClosed = Array.from({ length: 30 }, () => 0);
+    const dailyTotal  = Array.from({ length: 30 }, () => 0);
+    for (const sc of scored) {
+      const rec = recById.get(sc.recording_id);
+      if (!rec) continue;
+      const ageDays = Math.floor((todayMs - new Date(rec.recorded_at).getTime()) / DAY_MS);
+      if (ageDays < 0 || ageDays >= 30) continue;
+      const idx = 29 - ageDays;  // oldest-on-left, today-on-right
+      dailyScores[idx].push(sc.total_score || 0);
+      dailyTotal[idx] += 1;
+      if (sc.did_close === true) dailyClosed[idx] += 1;
+    }
+    const sparkScore = dailyScores.map((arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null);
+    const sparkClose = dailyTotal.map((t, i) => t ? Math.round((dailyClosed[i] / t) * 100) : null);
+    function sparklineSvg(series, color, width = 130, height = 32) {
+      const pts = series.map((v, i) => ({ v, i }));
+      const valid = pts.filter((p) => p.v !== null);
+      if (valid.length === 0) return "";
+      const min = Math.min(...valid.map((p) => p.v));
+      const max = Math.max(...valid.map((p) => p.v));
+      const range = max - min || 1;
+      const xStep = width / (series.length - 1);
+      const y = (v) => height - 4 - ((v - min) / range) * (height - 8);
+      // Draw a continuous line through valid points; gaps span over null buckets
+      const path = valid.map((p, i) => `${i === 0 ? "M" : "L"} ${(p.i * xStep).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+      const lastPt = valid[valid.length - 1];
+      return `<svg width="${width}" height="${height}" style="display:block;margin-top:6px;overflow:visible;" viewBox="0 0 ${width} ${height}">
+        <path d="${path}" stroke="${color}" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+        <circle cx="${(lastPt.i * xStep).toFixed(1)}" cy="${y(lastPt.v).toFixed(1)}" r="2.5" fill="${color}" />
+      </svg>`;
+    }
+
+    // ─── Per-location leaderboard ───
+    // Aggregate by location_id, hydrate with byLocationId for display name. Include locations
+    // even with 0 scorecards if they have any recordings — VPs want to see all their gyms.
+    const locStats = new Map();
+    for (const r of recordings) {
+      const k = r.location_id || "unknown";
+      if (!locStats.has(k)) {
+        const meta = byLocationId[k] || {};
+        locStats.set(k, {
+          location_id: k,
+          franchise_name: meta.franchise_name || k,
+          consults: 0, scoredCount: 0, scoreSum: 0, closeCount: 0, lastDate: null,
+        });
+      }
+      const ls = locStats.get(k);
+      ls.consults += 1;
+      const sc = latestByRec.get(r.recording_id);
+      if (sc) {
+        ls.scoredCount += 1;
+        ls.scoreSum += sc.total_score || 0;
+        if (sc.did_close === true) ls.closeCount += 1;
+      }
+      const d = new Date(r.recorded_at).getTime();
+      if (!ls.lastDate || d > ls.lastDate) ls.lastDate = d;
+    }
+    const leaderboard = Array.from(locStats.values()).map((l) => ({
+      ...l,
+      avgScore: l.scoredCount ? Math.round(l.scoreSum / l.scoredCount) : null,
+      closeRate: l.scoredCount ? Math.round((l.closeCount / l.scoredCount) * 100) : null,
+    })).sort((a, b) => {
+      // Locations with data come first, weakest avg first; locations without data last.
+      if (a.avgScore === null && b.avgScore === null) return b.consults - a.consults;
+      if (a.avgScore === null) return 1;
+      if (b.avgScore === null) return -1;
+      return a.avgScore - b.avgScore;
+    });
+    const activeLocations = leaderboard.filter((l) => l.consults > 0).length;
 
     // Recurring coaching themes — keyword scan across overall_coaching + per-section coaching + explainers.
     // Each theme: a display name and an array of regex/phrase patterns. A scorecard counts ONCE per theme
@@ -411,6 +497,13 @@ a{color:#0284C7;}
 .kpi{padding:16px 18px;}
 .kpi-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
 .kpi-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
+.kpi-foot{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;margin-top:6px;}
+.leaderboard{margin-bottom:20px;padding:20px 22px;}
+.lb-table{width:100%;border-collapse:collapse;margin-top:6px;}
+.lb-table th{background:transparent;padding:10px 12px;font-size:10px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.12em;border-bottom:1px solid #E5E7EB;text-align:center;}
+.lb-table td{padding:14px 12px;border-bottom:1px solid #F3F4F6;text-align:center;vertical-align:middle;}
+.lb-table tr:last-child td{border-bottom:none;}
+.lb-table tr:hover{background:#F9FAFB;}
 .tablets-list{font-size:11px;color:#6B7280;margin-top:6px;}
 .insights{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:24px;}
 @media(max-width:880px){.insights{grid-template-columns:1fr;}}
@@ -454,11 +547,57 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="wrap">
   <div class="kpi-grid">
     <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordings.length}</div></div>
-    <div class="card kpi"><div class="kpi-label">Scorecards</div><div class="kpi-num">${scorecards.length}</div></div>
+    <div class="card kpi"><div class="kpi-label">Scorecards</div><div class="kpi-num">${scored.length}</div><div class="kpi-foot">${historicalScorecardCount} total in history</div></div>
     <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div></div>
-    <div class="card kpi"><div class="kpi-label">Close Rate</div><div class="kpi-num" style="color:${closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626"};">${closeRate}<span style="font-size:18px;color:#9CA3AF;font-weight:600;">%</span></div></div>
-    <div class="card kpi"><div class="kpi-label">Avg Score</div><div class="kpi-num" style="color:${avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626"};">${avgTotal}<span style="font-size:18px;color:#9CA3AF;font-weight:600;"> / 100</span></div></div>
+    <div class="card kpi">
+      <div class="kpi-label">Close Rate</div>
+      <div class="kpi-num" style="color:${closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626"};">${closeRate}<span style="font-size:18px;color:#9CA3AF;font-weight:600;">%</span></div>
+      ${sparklineSvg(sparkClose, closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626")}
+      <div class="kpi-foot">last 30 days</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-label">Avg Score</div>
+      <div class="kpi-num" style="color:${avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626"};">${avgTotal}<span style="font-size:18px;color:#9CA3AF;font-weight:600;"> / 100</span></div>
+      ${sparklineSvg(sparkScore, avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626")}
+      <div class="kpi-foot">last 30 days</div>
+    </div>
     <div class="card kpi tablets-card"><div class="kpi-label">Tablets Online</div><div class="kpi-num" style="color:${connectedTablets.length > 0 ? "#00AEEF" : "#9CA3AF"};">${connectedTablets.length}</div>${connectedTablets.length ? `<div class="tablets-list">${connectedTablets.join(", ")}</div>` : ""}</div>
+  </div>
+
+  <div class="card panel leaderboard">
+    <div class="panel-header">
+      <div class="panel-eyebrow">Per-Location Leaderboard</div>
+      <div class="panel-sub">${activeLocations} active location${activeLocations === 1 ? "" : "s"} — weakest avg score first. Click a row to filter.</div>
+    </div>
+    ${leaderboard.length === 0 ? '<div class="panel-empty">No locations recorded yet.</div>' : `
+    <table class="lb-table">
+      <thead><tr>
+        <th style="text-align:left;">Location</th>
+        <th>Consults</th>
+        <th>Closes</th>
+        <th>Close %</th>
+        <th>Avg Score</th>
+        <th>Last Activity</th>
+      </tr></thead>
+      <tbody>
+      ${leaderboard.map((l) => {
+        const scoreColor = l.avgScore === null ? "#9CA3AF" : l.avgScore >= 70 ? "#00AEEF" : l.avgScore >= 50 ? "#0284C7" : "#DC2626";
+        const rateColor = l.closeRate === null ? "#9CA3AF" : l.closeRate >= 30 ? "#00AEEF" : l.closeRate >= 15 ? "#0284C7" : "#DC2626";
+        const lastDate = l.lastDate ? new Date(l.lastDate).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" }) : "—";
+        return `<tr>
+          <td style="text-align:left;">
+            <div style="font-size:13px;font-weight:700;color:#111827;">${l.franchise_name}</div>
+            <div style="font-size:11px;color:#6B7280;">${l.location_id}</div>
+          </td>
+          <td><span style="font-size:14px;font-weight:700;color:#111827;">${l.consults}</span></td>
+          <td><span style="font-size:14px;font-weight:700;color:#111827;">${l.closeCount}</span></td>
+          <td>${l.closeRate === null ? '<span style="color:#D1D5DB;">—</span>' : `<span style="font-size:13px;font-weight:800;color:${rateColor};">${l.closeRate}%</span>`}</td>
+          <td>${l.avgScore === null ? '<span style="color:#D1D5DB;">—</span>' : `<span style="font-size:14px;font-weight:800;color:${scoreColor};">${l.avgScore}<span style="font-size:11px;color:#9CA3AF;font-weight:600;"> /100</span></span>`}</td>
+          <td><span style="font-size:12px;color:#6B7280;">${lastDate}</span></td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table>`}
   </div>
 
   <div class="insights">
