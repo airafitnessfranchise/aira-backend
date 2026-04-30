@@ -313,66 +313,97 @@ app.get("/admin", async (req, res) => {
     const recordings = await db.getAllRecordings();
     const scorecards = await db.getAllScorecards();
     const scorecardMap = {};
-    scorecards.forEach(function (s) {
-      scorecardMap[s.recording_id] = s;
-    });
+    scorecards.forEach((s) => { scorecardMap[s.recording_id] = s; });
     const connectedTablets = Array.from(tabletConnections.keys());
-    const rows = recordings
-      .map(function (r) {
-        const sc = scorecardMap[r.recording_id];
-        const loc = byLocationId[r.location_id] || {};
-        const name = r.contact_name || r.appointment_id;
-        return (
-          "<tr><td>" +
-          new Date(r.recorded_at).toLocaleString("en-US", {
-            timeZone: "America/Chicago",
-          }) +
-          "</td><td>" +
-          (loc.franchise_name || r.location_id) +
-          "</td><td>" +
-          name +
-          "</td><td>" +
-          Math.round(r.duration_seconds / 60) +
-          "m " +
-          (r.duration_seconds % 60) +
-          's</td><td class="status-' +
-          (r.processing_status || "pending") +
-          '">' +
-          (r.processing_status || "pending") +
-          "</td><td>" +
-          (scorecardMap[r.recording_id]
-            ? scorecardMap[r.recording_id].total_score + "/100"
-            : "—") +
-          "</td><td>" +
-          (r.audio_file_url
-            ? '<a href="/playback/' +
-              r.recording_id +
-              '" style="color:#c8f060">▶ Play</a>'
-            : "—") +
-          "</td><td>" +
-          (scorecardMap[r.recording_id]
-            ? '<a href="/scorecard/' +
-              r.recording_id +
-              '" target="_blank" style="color:#c8f060;font-weight:bold;text-decoration:none;">' +
-              scorecardMap[r.recording_id].total_score +
-              "/100 →</a>"
-            : '<span style="color:#666;font-size:11px;">Pending</span>') +
-          "</td>"
-        );
-      })
-      .join("");
-    res.send(
-      '<!DOCTYPE html><html><head><title>Aira Admin</title><meta charset="utf-8"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background:#0a0a0a;color:#f0f0f0;padding:32px}h1{color:#c8f060;font-size:24px;margin-bottom:4px}.sub{color:#666;font-size:13px;margin-bottom:32px}.cards{display:flex;gap:16px;margin-bottom:32px;flex-wrap:wrap}.card{background:#111;border:1px solid #222;border-radius:12px;padding:20px 24px;min-width:160px}.card-num{font-size:32px;font-weight:bold;color:#c8f060}.card-label{color:#666;font-size:12px;margin-top:4px;text-transform:uppercase;letter-spacing:1px}table{width:100%;border-collapse:collapse;background:#111;border-radius:12px;overflow:hidden}th{background:#1a1a1a;padding:12px 16px;text-align:left;font-size:11px;color:#666;letter-spacing:1px;text-transform:uppercase}td{padding:12px 16px;border-bottom:1px solid #1a1a1a;font-size:13px}tr:last-child td{border-bottom:none}a{color:#c8f060;text-decoration:none}.status{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;text-transform:uppercase}.status-pending,.status-uploaded{background:#2a2a00;color:#ffcc00}.status-transcribing,.status-scoring{background:#00002a;color:#6666ff}.status-transcribed{background:#002a00;color:#00cc66}.status-scored{background:#0a2a0a;color:#c8f060}.status-failed{background:#2a0000;color:#ff4444}</style></head><body><h1>Aira Fitness - Consult Recorder</h1><p class="sub">Admin Dashboard</p><div class="cards"><div class="card"><div class="card-num">' +
-        recordings.length +
-        '</div><div class="card-label">Recordings</div></div><div class="card"><div class="card-num">' +
-        scorecards.length +
-        '</div><div class="card-label">Scorecards</div></div><div class="card"><div class="card-num">' +
-        connectedTablets.length +
-        '</div><div class="card-label">Tablets Online</div></div></div><table><thead><tr><th>Date</th><th>Location</th><th>Prospect</th><th>Duration</th><th>Status</th><th>Score</th><th>Audio</th><th>Scorecard</th></tr></thead><tbody>' +
-        (rows ||
-          '<tr><td colspan="7" style="text-align:center;color:#555;padding:40px">No recordings yet</td></tr>') +
-        "</tbody></table><script>setTimeout(function(){location.reload()},30000);<\/script></body></html>",
-    );
+
+    const fmtDate = (d) => new Date(d).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const fmtDuration = (sec) => Math.round(sec / 60) + "m " + (sec % 60) + "s";
+
+    const scorePill = (sc) => {
+      if (!sc) return '<span style="color:#9CA3AF;font-size:12px;">—</span>';
+      const score = sc.total_score;
+      const color = score >= 70 ? "#00AEEF" : score >= 50 ? "#0284C7" : "#DC2626";
+      return `<a href="/scorecard/${sc.recording_id}" target="_blank" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
+    };
+
+    const statusPill = (status) => {
+      const s = status || "pending";
+      let bg = "#F3F4F6", color = "#6B7280", border = "#E5E7EB";
+      if (s === "transcribing" || s === "scoring" || s === "transcribed") { bg = "#E0F4FB"; color = "#0284C7"; border = "#BAE6FD"; }
+      else if (s === "scored") { bg = "#0A0A0A"; color = "#fff"; border = "#0A0A0A"; }
+      else if (s === "failed") { bg = "#FEE2E2"; color = "#DC2626"; border = "#FECACA"; }
+      return `<span style="display:inline-block;padding:3px 10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">${s}</span>`;
+    };
+
+    const rows = recordings.map((r) => {
+      const sc = scorecardMap[r.recording_id];
+      const loc = byLocationId[r.location_id] || {};
+      const name = r.contact_name || r.appointment_id;
+      return `<tr>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDate(r.recorded_at)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#111827;font-weight:600;">${loc.franchise_name || r.location_id}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#374151;">${name}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDuration(r.duration_seconds)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${statusPill(r.processing_status)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${scorePill(sc)}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="/playback/${r.recording_id}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><title>Aira Admin</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
+a{color:#0284C7;}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px 48px;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:24px 28px;}
+.subhead-inner{max-width:1200px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
+.subtitle{font-size:13px;color:#6B7280;margin-top:2px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:24px 0 20px;}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:18px 20px;}
+.card-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
+.card-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-top:6px;}
+.tablets-card .card-num{color:${connectedTablets.length > 0 ? "#00AEEF" : "#9CA3AF"};}
+.tablets-list{font-size:11px;color:#6B7280;margin-top:6px;}
+.table-wrap{background:#fff;border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead th{background:#F9FAFB;padding:12px 16px;text-align:left;font-size:10px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.12em;border-bottom:1px solid #E5E7EB;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#F9FAFB;}
+.empty{text-align:center;color:#9CA3AF;padding:40px;font-size:13px;}
+.refresh{font-size:11px;color:#9CA3AF;margin-top:14px;text-align:right;}
+</style></head><body>
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">Consult Recorder</div>
+  <div class="title">Admin Dashboard</div>
+  <div class="subtitle">Live view of all consultation recordings and scoring</div>
+</div></div>
+<div class="wrap">
+  <div class="cards">
+    <div class="card"><div class="card-num">${recordings.length}</div><div class="card-label">Recordings</div></div>
+    <div class="card"><div class="card-num">${scorecards.length}</div><div class="card-label">Scorecards</div></div>
+    <div class="card tablets-card"><div class="card-num">${connectedTablets.length}</div><div class="card-label">Tablets Online</div>${connectedTablets.length ? `<div class="tablets-list">${connectedTablets.join(", ")}</div>` : ""}</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Location</th><th>Prospect</th><th>Duration</th><th>Status</th><th>Score</th><th>Audio</th>
+      </tr></thead>
+      <tbody>
+        ${rows || '<tr><td colspan="7" class="empty">No recordings yet</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+  <div class="refresh">Auto-refreshes every 30 seconds</div>
+</div>
+<script>setTimeout(()=>location.reload(),30000);</script>
+</body></html>`;
+    res.send(html);
   } catch (err) {
     console.error("[Admin] Error:", err.message);
     res.status(500).send("Error loading admin: " + err.message);
@@ -381,84 +412,102 @@ app.get("/admin", async (req, res) => {
 
 app.get("/scorecard/:id", async (req, res) => {
   try {
-    const recordings = await db.getAllRecordings();
-    const scorecards = await db.getAllScorecards();
-    const r = recordings.find((x) => x.recording_id === req.params.id);
+    const r = await db.getRecording(req.params.id);
     if (!r) return res.status(404).send("Recording not found");
-    const s = scorecards.find((x) => x.recording_id === req.params.id);
-    if (!s)
-      return res
-        .status(404)
-        .send(
-          "Scorecard not yet available — check back after processing completes.",
-        );
+    const s = await db.getScorecardByRecording(req.params.id);
+    if (!s) return res.status(404).send("Scorecard not yet available — check back after processing completes.");
     const { byLocationId } = require("./locations");
     const loc = byLocationId[r.location_id] || {};
     const name = r.contact_name || r.appointment_id;
-    const date = new Date(r.recorded_at).toLocaleDateString("en-US", {
-      timeZone: "America/Chicago",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-    const scoreColor =
-      s.total_score >= 80
-        ? "#c8f060"
-        : s.total_score >= 60
-          ? "#f0c060"
-          : "#ff6b6b";
+    const date = new Date(r.recorded_at).toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    const scoreColor = s.total_score >= 70 ? "#00AEEF" : s.total_score >= 50 ? "#0284C7" : "#DC2626";
     const sections = [
-      ["Sit-Down Presentation", s.sitdown_score],
-      ["Objection Handling", s.objection_score],
-      ["Language & Delivery", s.language_score],
-      ["The Close", s.close_score],
+      ["Sit-Down Presentation", s.sitdown_score, s.sitdown_score_explainer],
+      ["Objection Handling", s.objection_score, s.objection_score_explainer],
+      ["Language & Psychology", s.language_score, s.language_score_explainer],
+      ["Close Execution", s.close_score, s.close_score_explainer],
     ];
-    res.send(`<!DOCTYPE html><html><head><title>Scorecard — ${name}</title><meta charset="utf-8"><style>
+    const sectionRow = ([label, score, explainer]) => {
+      const pct = score != null ? (score / 25) * 100 : 0;
+      const c = pct >= 70 ? "#00AEEF" : pct >= 50 ? "#0284C7" : "#DC2626";
+      return `<div style="margin-top:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <div style="font-size:14px;font-weight:700;color:#111827;">${label}</div>
+          <div style="font-size:14px;font-weight:800;color:${c};">${score != null ? score : "—"}<span style="color:#6B7280;font-weight:600;"> / 25</span></div>
+        </div>
+        <div style="background:#F3F4F6;border-radius:9999px;height:6px;margin-top:8px;overflow:hidden;">
+          <div style="background:${c};width:${pct}%;height:6px;"></div>
+        </div>
+        ${explainer ? `<div style="font-size:13px;color:#6B7280;line-height:1.55;margin:6px 0 14px;">${explainer}</div>` : '<div style="margin-bottom:14px;"></div>'}
+      </div>`;
+    };
+    const closedBadge = s.did_close === true
+      ? `<div style="display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;"><span style="color:#00AEEF;">✓</span> Sale Closed</div>`
+      : "";
+
+    res.send(`<!DOCTYPE html><html><head><title>Scorecard — ${name}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#0a0a0a;color:#f0f0f0;padding:32px;max-width:800px;margin:0 auto}
-h1{color:#c8f060;font-size:22px;margin-bottom:4px}
-.sub{color:#666;font-size:13px;margin-bottom:32px}
-.score-big{font-size:56px;font-weight:bold;color:${scoreColor};line-height:1}
-.summary{color:#ccc;font-size:15px;margin:16px 0 32px;line-height:1.6}
-.scores-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px}
-.section{background:#111;border:1px solid #222;border-radius:10px;padding:16px}
-.sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.sec-label{color:#c8f060;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px}
-.sec-score{color:#fff;font-size:18px;font-weight:bold}
-.bar{background:#222;border-radius:4px;height:6px}
-.bar-fill{height:6px;border-radius:4px;background:#c8f060}
-.coaching-box{background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:24px}
-.coaching-box h3{color:#c8f060;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-.coaching-box p{color:#bbb;font-size:13px;line-height:1.8;white-space:pre-wrap}
-.transcript-box{background:#111;border:1px solid #222;border-radius:10px;padding:20px;margin-bottom:24px}
-.transcript-box h3{color:#c8f060;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-.transcript-box p{color:#888;font-size:12px;line-height:1.8;white-space:pre-wrap;max-height:400px;overflow-y:auto}
-.back{display:inline-block;color:#666;font-size:12px;text-decoration:none;margin-bottom:24px}
-.back:hover{color:#c8f060}
-.flag{display:inline-block;background:#ff000022;border:1px solid #ff4444;color:#ff4444;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:bold;margin-bottom:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
+a{color:#0284C7;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:22px 28px 14px;}
+.subhead-inner{max-width:840px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;line-height:1.15;}
+.subtitle{font-size:13px;color:#6B7280;margin-top:4px;}
+.wrap{max-width:840px;margin:0 auto;padding:24px;}
+.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;margin-bottom:16px;font-weight:600;}
+.back:hover{color:#0A0A0A;}
+.flag{display:inline-block;background:#fff;border:1px solid #DC2626;border-left:4px solid #DC2626;color:#111827;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;margin-bottom:16px;}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:24px;margin-bottom:16px;}
+.score-card{text-align:center;padding:28px;background:#F9FAFB;}
+.score-label{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
+.score-big{font-size:62px;font-weight:900;color:${scoreColor};line-height:1.05;margin-top:6px;letter-spacing:-.02em;}
+.score-of{font-size:22px;color:#6B7280;font-weight:600;letter-spacing:0;}
+.summary{padding:18px 20px;background:#F9FAFB;border-left:3px solid #00AEEF;border-radius:4px;margin-bottom:16px;}
+.summary-label{font-size:10px;font-weight:800;color:#0284C7;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;}
+.summary-body{font-size:14px;color:#111827;line-height:1.6;}
+.section-block{padding:24px;}
+.section-title{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
+.coaching{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:6px;padding:24px;margin-bottom:16px;}
+.coaching-header{font-size:11px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;}
+.coaching-body{font-size:14.5px;color:#111827;line-height:1.7;}
+.coaching-body p{margin-top:12px;}
+.coaching-body p:first-child{margin-top:0;}
+.transcript{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:18px;font-size:13px;color:#374151;line-height:1.6;white-space:pre-wrap;max-height:500px;overflow-y:auto;}
 </style></head><body>
-<a href="/admin" class="back">← Back to Admin</a>
-${s.flagged_for_review ? '<div class="flag">⚠ Flagged for Review</div>' : ""}
-<h1>${name}</h1>
-<div class="sub">${loc.franchise_name || r.location_id} &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; ${Math.round(r.duration_seconds / 60)}m ${r.duration_seconds % 60}s</div>
-<div class="score-big">${s.total_score}<span style="font-size:24px;color:#666">/100</span></div>
-<p class="summary">${s.ai_summary || ""}</p>
-<div class="scores-grid">
-${sections
-  .map(
-    ([label, score]) => `
-<div class="section">
-  <div class="sec-header">
-    <span class="sec-label">${label}</span>
-    <span class="sec-score">${score != null ? score + "/25" : "—"}</span>
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">Consultation Scorecard</div>
+  <div class="title">${loc.franchise_name || r.location_id}</div>
+  <div class="subtitle">${date} &nbsp;·&nbsp; ${name} &nbsp;·&nbsp; ${Math.round(r.duration_seconds / 60)}m ${r.duration_seconds % 60}s</div>
+</div></div>
+<div class="wrap">
+  <a href="/admin" class="back">← Back to Admin</a>
+  ${s.flagged_for_review ? '<div class="flag">⚠ Flagged for Review</div>' : ""}
+  <div class="card score-card">
+    <div class="score-label">Overall Score</div>
+    <div class="score-big">${s.total_score}<span class="score-of"> / 100</span></div>
+    ${closedBadge}
   </div>
-  <div class="bar"><div class="bar-fill" style="width:${score != null ? (score / 25) * 100 : 0}%"></div></div>
-</div>`,
-  )
-  .join("")}
+  <div class="summary">
+    <div class="summary-label">Summary</div>
+    <div class="summary-body">${s.ai_summary || ""}</div>
+  </div>
+  <div class="card section-block">
+    ${sections.map(sectionRow).join("")}
+  </div>
+  ${s.overall_coaching || s.coaching_note ? `<div class="coaching">
+    <div class="coaching-header">Coaching Notes</div>
+    <div class="coaching-body"><p>${(s.overall_coaching || s.coaching_note).replace(/\n\n+/g, '</p><p>').replace(/\n/g, " ")}</p></div>
+  </div>` : ""}
+  ${r.transcript ? `<div class="card">
+    <div class="section-title">Full Transcript</div>
+    <div class="transcript">${r.transcript}</div>
+  </div>` : ""}
 </div>
-${s.coaching_note ? `<div class="coaching-box"><h3>Coaching Notes</h3><p>${s.coaching_note}</p></div>` : ""}
-${r.transcript ? `<div class="transcript-box"><h3>Transcript</h3><p>${r.transcript}</p></div>` : ""}
 </body></html>`);
   } catch (err) {
     console.error("[Scorecard] Error:", err.message);
@@ -470,23 +519,45 @@ app.get("/playback/:recording_id", async (req, res) => {
   const rec = await db.getRecording(req.params.recording_id);
   if (!rec || !rec.audio_file_url) return res.status(404).send("Not found");
   const name = rec.contact_name || rec.appointment_id;
-  res.send(
-    "<!DOCTYPE html><html><head><title>Playback</title><style>body{background:#0a0a0a;color:#f0f0f0;font-family:Arial;padding:32px}h2{color:#c8f060}</style></head><body><h2>Recording: " +
-      name +
-      '</h2><p style="color:#666;margin-bottom:16px">' +
-      new Date(rec.recorded_at).toLocaleString("en-US", {
-        timeZone: "America/Chicago",
-      }) +
-      '</p><audio controls style="width:100%;margin-bottom:24px"><source src="/audio/' +
-      path.basename(rec.audio_file_url) +
-      '"></audio>' +
-      (rec.transcript
-        ? '<h3 style="color:#888;margin-bottom:8px">Transcript</h3><p style="line-height:1.7;color:#ccc">' +
-          rec.transcript +
-          "</p>"
-        : '<p style="color:#555">No transcript yet</p>') +
-      '<p style="margin-top:16px"><a href="/admin" style="color:#c8f060">Back to admin</a></p></body></html>',
-  );
+  const loc = byLocationId[rec.location_id] || {};
+  const dt = new Date(rec.recorded_at).toLocaleString("en-US", { timeZone: "America/Chicago" });
+  res.send(`<!DOCTYPE html><html><head><title>Playback — ${name}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:22px 28px 14px;}
+.subhead-inner{max-width:760px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.title{font-size:22px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;line-height:1.2;}
+.subtitle{font-size:13px;color:#6B7280;margin-top:4px;}
+.wrap{max-width:760px;margin:0 auto;padding:24px;}
+.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;margin-bottom:16px;font-weight:600;}
+.back:hover{color:#0A0A0A;}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:24px;margin-bottom:16px;}
+audio{width:100%;}
+.section-title{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;}
+.transcript{font-size:13px;color:#374151;line-height:1.7;white-space:pre-wrap;}
+</style></head><body>
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">Recording Playback</div>
+  <div class="title">${name}</div>
+  <div class="subtitle">${loc.franchise_name || rec.location_id} &nbsp;·&nbsp; ${dt}</div>
+</div></div>
+<div class="wrap">
+  <a href="/admin" class="back">← Back to Admin</a>
+  <div class="card">
+    <div class="section-title">Audio</div>
+    <audio controls><source src="/audio/${path.basename(rec.audio_file_url)}"></audio>
+  </div>
+  ${rec.transcript ? `<div class="card">
+    <div class="section-title">Transcript</div>
+    <div class="transcript">${rec.transcript}</div>
+  </div>` : `<div class="card"><div style="color:#9CA3AF;font-size:13px;">No transcript yet</div></div>`}
+</div>
+</body></html>`);
 });
 
 app.use("/audio", express.static(UPLOAD_DIR));
