@@ -5,26 +5,24 @@ const MIKE_EMAIL = process.env.MIKE_EMAIL || "mikebell@airafitness.com";
 const PUBLIC_URL =
   process.env.PUBLIC_URL ||
   "https://aira-backend-production-2a71.up.railway.app";
-const LOGO_URL =
-  process.env.LOGO_URL ||
-  "https://aira-backend-production-2a71.up.railway.app/logo-white.png";
-const BRAND_BLUE = "#00AEEF";       // logo accent
-const BRAND_BLUE_DARK = "#0284C7";  // for hover/border accents
-const BRAND_BLACK = "#0A0A0A";      // header / footer
-const NEUTRAL_900 = "#111827";      // primary text
-const NEUTRAL_700 = "#374151";      // body text
-const NEUTRAL_500 = "#6B7280";      // muted text
-const NEUTRAL_300 = "#D1D5DB";      // borders
-const NEUTRAL_100 = "#F3F4F6";      // page bg
-const NEUTRAL_50  = "#F9FAFB";      // card bg
-const ALERT_RED   = "#DC2626";      // only used for sub-50 scores
+const BRAND_BLUE = "#00AEEF"; // logo accent
+const BRAND_BLUE_DARK = "#0284C7"; // for hover/border accents
+const BRAND_BLACK = "#0A0A0A"; // header / footer
+const NEUTRAL_900 = "#111827"; // primary text
+const NEUTRAL_700 = "#374151"; // body text
+const NEUTRAL_500 = "#6B7280"; // muted text
+const NEUTRAL_300 = "#D1D5DB"; // borders
+const NEUTRAL_100 = "#F3F4F6"; // page bg
+const NEUTRAL_50 = "#F9FAFB"; // card bg
+const ALERT_RED = "#DC2626"; // only used for sub-50 scores
 
 // Renders one score row: label, score/max, progress bar, and the 1-2 sentence explainer.
 function scoreRowHtml(label, score, max, explainer) {
   const pct = Math.round((score / max) * 100);
   // Blue-forward palette: high = brand blue, mid = darker brand blue, low = red.
   // No green, no orange — colors stay coherent with the logo.
-  const color = pct >= 70 ? BRAND_BLUE : pct >= 50 ? BRAND_BLUE_DARK : ALERT_RED;
+  const color =
+    pct >= 70 ? BRAND_BLUE : pct >= 50 ? BRAND_BLUE_DARK : ALERT_RED;
   const explainerHtml = explainer
     ? `<div style="font-size:12px;color:${NEUTRAL_500};line-height:1.5;margin:4px 0 14px;">${explainer}</div>`
     : '<div style="margin-bottom:14px;"></div>';
@@ -206,8 +204,10 @@ async function sendScorecardEmail(
   const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#EEF1F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div style="max-width:640px;margin:20px auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
 
-    <div style="background:${BRAND_BLACK};padding:28px 28px 24px;text-align:center;">
-      <img src="${LOGO_URL}" alt="Aira Fitness" height="40" style="display:block;height:40px;width:auto;margin:0 auto;border:0;outline:0;" />
+    <div style="background:${BRAND_BLACK};padding:28px 28px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;letter-spacing:.18em;line-height:1;">
+        <span style="color:${BRAND_BLUE};">AIRA</span><span style="color:#fff;">&nbsp;FITNESS</span>
+      </div>
     </div>
 
     <div style="background:#fff;padding:24px 28px 14px;border-bottom:3px solid ${BRAND_BLUE};">
