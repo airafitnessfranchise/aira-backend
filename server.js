@@ -915,8 +915,14 @@ app.get("/admin/locations", adminAuth, async (req, res) => {
   const allLocs = ALL_LOCATIONS.slice().sort((a, b) =>
     (a.franchise_name || "").localeCompare(b.franchise_name || ""),
   );
+  const addedSlug = req.query.added_slug
+    ? decodeURIComponent(String(req.query.added_slug))
+    : null;
+  const addedUrl = addedSlug
+    ? `${process.env.PUBLIC_URL || "https://aira-backend-production-2a71.up.railway.app"}/recorder.html?location=${encodeURIComponent(addedSlug)}`
+    : null;
   const flash = req.query.added
-    ? `<div class="flash" style="background:#ECFDF5;border-left:3px solid #00AEEF;color:#0A0A0A;">Added ${decodeURIComponent(String(req.query.added))} ✓</div>`
+    ? `<div class="flash" style="background:#ECFDF5;border-left:3px solid #00AEEF;color:#0A0A0A;">Added <b>${decodeURIComponent(String(req.query.added))}</b> ✓${addedUrl ? `<div style="margin-top:6px;font-size:12px;font-weight:500;">Tablet URL: <code style="font-size:11px;background:#fff;border:1px solid #BAE6FD;border-radius:4px;padding:2px 6px;color:#0284C7;">${addedUrl}</code></div>` : ""}</div>`
     : "";
   const flashDel = req.query.deleted
     ? `<div class="flash" style="background:#FEF3F2;border-left:3px solid #DC2626;color:#0A0A0A;">Deleted ${decodeURIComponent(String(req.query.deleted))} ✓</div>`
@@ -925,14 +931,25 @@ app.get("/admin/locations", adminAuth, async (req, res) => {
     ? `<div class="flash" style="background:#FEF3F2;border-left:3px solid #DC2626;color:#0A0A0A;">${decodeURIComponent(String(req.query.err))}</div>`
     : "";
 
+  const baseUrl =
+    process.env.PUBLIC_URL ||
+    "https://aira-backend-production-2a71.up.railway.app";
+  const recorderUrlFor = (location_id) =>
+    `${baseUrl}/recorder.html?location=${encodeURIComponent(location_id)}`;
+
   const rows = allLocs
     .map((l) => {
       const isCustom = !!l._custom;
+      const url = recorderUrlFor(l.location_id);
       return `<tr>
       <td><div style="font-weight:700;color:#111827;">${l.franchise_name}</div><div style="font-size:11px;color:#6B7280;">${l.location_id}</div></td>
-      <td style="font-size:13px;color:#374151;">${l.franchisee_name || '<span style="color:#D1D5DB;">—</span>'}</td>
-      <td style="font-size:13px;color:#374151;">${l.franchisee_email || '<span style="color:#D1D5DB;">—</span>'}</td>
-      <td style="font-size:13px;color:#374151;">${l.vp_email || '<span style="color:#D1D5DB;">—</span>'}</td>
+      <td style="font-size:13px;color:#374151;">${l.franchisee_email || '<span style="color:#D1D5DB;">—</span>'}${l.vp_email ? `<div style="font-size:11px;color:#9CA3AF;margin-top:2px;">VP: ${l.vp_email}</div>` : ""}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <code style="flex:1;font-size:11px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:4px;padding:6px 8px;color:#0284C7;font-family:ui-monospace,Menlo,Monaco,monospace;word-break:break-all;line-height:1.4;">${url}</code>
+          <button type="button" onclick="copyUrl(this, '${url.replace(/'/g, "\\'")}')" style="flex-shrink:0;padding:6px 10px;background:#0A0A0A;color:#fff;border:0;border-radius:4px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:inherit;">Copy</button>
+        </div>
+      </td>
       <td>${isCustom ? '<span style="display:inline-block;padding:2px 8px;background:#E0F4FB;color:#0284C7;border-radius:9999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Custom</span>' : '<span style="display:inline-block;padding:2px 8px;background:#F3F4F6;color:#6B7280;border-radius:9999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Built-in</span>'}</td>
       <td style="text-align:right;">${isCustom ? `<form method="POST" action="/admin/locations/delete/${encodeURIComponent(l.location_id)}" style="display:inline;" onsubmit="return confirm('Delete ${l.franchise_name}?');"><button type="submit" style="background:transparent;border:0;color:#DC2626;font-weight:700;font-size:12px;cursor:pointer;">Delete</button></form>` : '<span style="color:#D1D5DB;font-size:11px;">in code</span>'}</td>
     </tr>`;
@@ -1012,14 +1029,18 @@ tbody tr:hover{background:#F9FAFB;}
     </form>
   </div>
 
+  <div class="card" style="background:#F0FBFF;border:1px solid #BAE6FD;">
+    <h2 style="font-size:14px;color:#0284C7;">How to set up a tablet</h2>
+    <p class="lead" style="margin-bottom:0;">Each gym has its own unique recorder URL — that's what the tablet at the front desk should be set to. Open the URL in the tablet's browser, allow microphone access, then save it as a home-screen shortcut. The location_id is baked into the URL so every recording from that tablet is automatically tagged to the right gym. Click <b>Copy</b> next to any URL below to grab it.</p>
+  </div>
+
   <div class="section-eyebrow">All Gyms (${allLocs.length})</div>
   <div class="card" style="padding:0;overflow:hidden;">
     <table>
       <thead><tr>
         <th>Gym</th>
-        <th>Franchisee</th>
-        <th>Franchisee Email</th>
-        <th>VP Email</th>
+        <th>Email Recipients</th>
+        <th>Tablet / Recorder URL</th>
         <th>Type</th>
         <th></th>
       </tr></thead>
@@ -1027,6 +1048,22 @@ tbody tr:hover{background:#F9FAFB;}
     </table>
   </div>
 </div>
+<script>
+function copyUrl(btn, url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const original = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.style.background = '#00AEEF';
+    setTimeout(() => { btn.textContent = original; btn.style.background = '#0A0A0A'; }, 1400);
+  }).catch(() => {
+    // fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1400); } catch (e) { alert('Copy failed: ' + url); }
+    document.body.removeChild(ta);
+  });
+}
+</script>
 </body></html>`);
 });
 
@@ -1081,7 +1118,10 @@ app.post(
       removeCustomLocationFromCache(slug);
       await loadCustomLocations();
       res.redirect(
-        "/admin/locations?added=" + encodeURIComponent(franchise_name),
+        "/admin/locations?added=" +
+          encodeURIComponent(franchise_name) +
+          "&added_slug=" +
+          encodeURIComponent(slug),
       );
     } catch (err) {
       console.error("[Admin/locations] add error:", err.message);
