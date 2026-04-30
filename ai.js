@@ -229,6 +229,10 @@ OUTPUT — RETURN ONLY VALID JSON, NO OTHER TEXT, NO MARKDOWN
   "close_score": 0,
   "did_close": false,
   "ai_summary": "Two sentences. First: the genuine strength and why it worked. Second: the most important gap and what it cost. Vary the phrasing — never start two summaries the same way.",
+  "sitdown_score_explainer": "1-2 sentences: why this score, and what the rep would have needed to do to score a perfect 25. Specific to THIS consult, not a generic rule.",
+  "objection_score_explainer": "1-2 sentences: why this score, and what the rep would have needed to do to score a perfect 25. Specific to THIS consult.",
+  "language_score_explainer": "1-2 sentences: why this score, and what the rep would have needed to do to score a perfect 25. Specific to THIS consult.",
+  "close_score_explainer": "1-2 sentences: why this score, and what the rep would have needed to do to score a perfect 25. Specific to THIS consult.",
   "sitdown_what_said": "exact transcript quote",
   "sitdown_what_to_say": "exact alternative script, or empty string if no gap",
   "sitdown_coaching": "80-200 words specific to this moment",
@@ -299,6 +303,10 @@ async function scoreTranscript(transcript) {
         "close_score",
         "ai_summary",
         "overall_coaching",
+        "sitdown_score_explainer",
+        "objection_score_explainer",
+        "language_score_explainer",
+        "close_score_explainer",
       ];
       for (const field of required) {
         if (scorecard[field] === undefined)

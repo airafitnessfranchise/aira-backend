@@ -6,6 +6,32 @@ const PUBLIC_URL =
   process.env.PUBLIC_URL ||
   "https://aira-backend-production-2a71.up.railway.app";
 
+// Renders one score row: label, score/max, progress bar, and the 1-2 sentence explainer.
+function scoreRowHtml(label, score, max, explainer) {
+  const pct = Math.round((score / max) * 100);
+  const color = pct >= 90 ? "#22c55e" : pct >= 70 ? "#84cc16" : pct >= 50 ? "#f59e0b" : "#ef4444";
+  const explainerHtml = explainer
+    ? `<div style="font-size:12px;color:#6b7280;line-height:1.55;margin:4px 0 14px;">${explainer}</div>`
+    : '<div style="margin-bottom:14px;"></div>';
+  return `
+    <div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:13px;color:#374151;font-weight:600;">${label}</div>
+        <div style="font-size:13px;font-weight:700;color:${color};">${score}/${max}</div>
+      </div>
+      <div style="background:#e5e7eb;border-radius:9999px;height:5px;margin-top:6px;">
+        <div style="background:${color};width:${pct}%;height:5px;border-radius:9999px;"></div>
+      </div>
+      ${explainerHtml}
+    </div>`;
+}
+
+function scoreRowText(label, score, max, explainer) {
+  let out = `${label}: ${score}/${max}`;
+  if (explainer) out += `\n  ${explainer}`;
+  return out;
+}
+
 // Score-aware coaching header. Returns null when there's no coaching body to render.
 function coachingHeaderFor(scorecard) {
   const body = (
@@ -82,11 +108,17 @@ async function sendScorecardEmail(
       </div>`
     : "";
 
-  const scorecardLinkUrl = `${PUBLIC_URL}/scorecard/${recording.recording_id}`;
-  const scorecardLinkText = `\n\nFull scorecard & transcript: ${scorecardLinkUrl}`;
-  const scorecardLinkHtml = `<div style="margin:24px 0 0;text-align:center;padding-top:20px;border-top:1px solid #e5e7eb;">
-        <a href="${scorecardLinkUrl}" style="display:inline-block;padding:10px 22px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">View full scorecard &amp; transcript</a>
-      </div>`;
+  const transcriptText = recording.transcript
+    ? `\n\n--- FULL TRANSCRIPT ---\n${recording.transcript}\n--- END TRANSCRIPT ---`
+    : "";
+
+  const transcriptHtml = recording.transcript
+    ? `<div style="margin:32px 0 0;">
+        <h2 style="font-size:15px;font-weight:800;color:#111;margin:0 0 8px;padding-top:24px;border-top:2px solid #e5e7eb;">Full Transcript</h2>
+        <p style="font-size:12px;color:#6b7280;margin:0 0 12px;">Raw transcription of the consultation audio.</p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px;font-size:13px;color:#374151;line-height:1.8;white-space:pre-wrap;">${recording.transcript}</div>
+      </div>`
+    : "";
 
   // The single coaching block (orange callout). Only renders if there's real coaching.
   const coachingHtml =
@@ -111,11 +143,15 @@ async function sendScorecardEmail(
       : "",
     didClose ? "✓ SALE CLOSED" : "",
     `\nOVERALL SCORE: ${scorecard.total_score}/100\n`,
+    scoreRowText("Sit-Down Presentation", scorecard.sitdown_score, 25, scorecard.sitdown_score_explainer),
+    scoreRowText("Objection Handling", scorecard.objection_score, 25, scorecard.objection_score_explainer),
+    scoreRowText("Language & Psychology", scorecard.language_score, 25, scorecard.language_score_explainer),
+    scoreRowText("Close Execution", scorecard.close_score, 25, scorecard.close_score_explainer),
     `\nSUMMARY:\n${scorecard.ai_summary}`,
     coachingTextBlock,
     audioTextBlock,
     "\nEvery word matters. The script is built on human psychology — when you follow it, you give yourself the best possible chance of a yes.\n\nAira Fitness",
-    scorecardLinkText,
+    transcriptText,
   ]
     .filter(Boolean)
     .join("\n");
@@ -155,7 +191,14 @@ async function sendScorecardEmail(
         ${closedBadge}
       </div>
 
-<div style="padding:14px 18px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;margin:20px 0;">
+      <div style="margin:8px 0 20px;">
+        ${scoreRowHtml("Sit-Down Presentation", scorecard.sitdown_score, 25, scorecard.sitdown_score_explainer)}
+        ${scoreRowHtml("Objection Handling", scorecard.objection_score, 25, scorecard.objection_score_explainer)}
+        ${scoreRowHtml("Language & Psychology", scorecard.language_score, 25, scorecard.language_score_explainer)}
+        ${scoreRowHtml("Close Execution", scorecard.close_score, 25, scorecard.close_score_explainer)}
+      </div>
+
+      <div style="padding:14px 18px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:4px;margin:20px 0;">
         <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Summary</div>
         <div style="font-size:13px;color:#15803d;line-height:1.6;">${scorecard.ai_summary}</div>
       </div>
@@ -164,7 +207,7 @@ async function sendScorecardEmail(
 
       ${audioHtmlBlock}
 
-      ${scorecardLinkHtml}
+      ${transcriptHtml}
     </div>
 
     <div style="background:#f9fafb;padding:16px 28px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af;">

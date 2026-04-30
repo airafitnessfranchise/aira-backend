@@ -212,7 +212,7 @@ async function createScorecard({ recording_id, scorecard }) {
 
 async function getScorecardByRecording(recording_id) {
   const { rows } = await pool.query(
-    "SELECT * FROM scorecards WHERE recording_id = $1",
+    "SELECT * FROM scorecards WHERE recording_id = $1 ORDER BY created_at DESC LIMIT 1",
     [recording_id],
   );
   return rows[0] || null;
