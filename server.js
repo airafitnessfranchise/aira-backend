@@ -313,7 +313,9 @@ app.get("/admin", async (req, res) => {
     const recordings = await db.getAllRecordings();
     const scorecards = await db.getAllScorecards();
     const scorecardMap = {};
-    scorecards.forEach((s) => { scorecardMap[s.recording_id] = s; });
+    scorecards.forEach((s) => {
+      scorecardMap[s.recording_id] = s;
+    });
     const connectedTablets = Array.from(tabletConnections.keys());
 
     // ─── Analytics ───
@@ -324,20 +326,45 @@ app.get("/admin", async (req, res) => {
     const latestByRec = new Map();
     for (const sc of scorecards) {
       const prev = latestByRec.get(sc.recording_id);
-      if (!prev || new Date(sc.created_at) > new Date(prev.created_at)) latestByRec.set(sc.recording_id, sc);
+      if (!prev || new Date(sc.created_at) > new Date(prev.created_at))
+        latestByRec.set(sc.recording_id, sc);
     }
     const scored = Array.from(latestByRec.values());
-    const historicalScorecardCount = scorecards.length;  // includes every rescore — never lost
+    const historicalScorecardCount = scorecards.length; // includes every rescore — never lost
 
     const totalCloses = scored.filter((s) => s.did_close === true).length;
-    const closeRate = scored.length ? Math.round((totalCloses / scored.length) * 100) : 0;
-    const avgTotal = scored.length ? Math.round(scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length) : 0;
-    const avgCat = (key) => scored.length ? Math.round(scored.reduce((a, s) => a + (s[key] || 0), 0) / scored.length * 10) / 10 : 0;
+    const closeRate = scored.length
+      ? Math.round((totalCloses / scored.length) * 100)
+      : 0;
+    const avgTotal = scored.length
+      ? Math.round(
+          scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length,
+        )
+      : 0;
+    const avgCat = (key) =>
+      scored.length
+        ? Math.round(
+            (scored.reduce((a, s) => a + (s[key] || 0), 0) / scored.length) *
+              10,
+          ) / 10
+        : 0;
     const catStats = [
       { label: "Sit-Down", avg: avgCat("sitdown_score"), key: "sitdown_score" },
-      { label: "Objection Handling", avg: avgCat("objection_score"), key: "objection_score" },
-      { label: "Language & Psychology", avg: avgCat("language_score"), key: "language_score" },
-      { label: "Close Execution", avg: avgCat("close_score"), key: "close_score" },
+      {
+        label: "Objection Handling",
+        avg: avgCat("objection_score"),
+        key: "objection_score",
+      },
+      {
+        label: "Language & Psychology",
+        avg: avgCat("language_score"),
+        key: "language_score",
+      },
+      {
+        label: "Close Execution",
+        avg: avgCat("close_score"),
+        key: "close_score",
+      },
     ].sort((a, b) => a.avg - b.avg);
 
     // ─── 30-day daily series (for sparklines) ───
@@ -347,19 +374,27 @@ app.get("/admin", async (req, res) => {
     const DAY_MS = 86400000;
     const dailyScores = Array.from({ length: 30 }, () => []);
     const dailyClosed = Array.from({ length: 30 }, () => 0);
-    const dailyTotal  = Array.from({ length: 30 }, () => 0);
+    const dailyTotal = Array.from({ length: 30 }, () => 0);
     for (const sc of scored) {
       const rec = recById.get(sc.recording_id);
       if (!rec) continue;
-      const ageDays = Math.floor((todayMs - new Date(rec.recorded_at).getTime()) / DAY_MS);
+      const ageDays = Math.floor(
+        (todayMs - new Date(rec.recorded_at).getTime()) / DAY_MS,
+      );
       if (ageDays < 0 || ageDays >= 30) continue;
-      const idx = 29 - ageDays;  // oldest-on-left, today-on-right
+      const idx = 29 - ageDays; // oldest-on-left, today-on-right
       dailyScores[idx].push(sc.total_score || 0);
       dailyTotal[idx] += 1;
       if (sc.did_close === true) dailyClosed[idx] += 1;
     }
-    const sparkScore = dailyScores.map((arr) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null);
-    const sparkClose = dailyTotal.map((t, i) => t ? Math.round((dailyClosed[i] / t) * 100) : null);
+    const sparkScore = dailyScores.map((arr) =>
+      arr.length
+        ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+        : null,
+    );
+    const sparkClose = dailyTotal.map((t, i) =>
+      t ? Math.round((dailyClosed[i] / t) * 100) : null,
+    );
     function sparklineSvg(series, color, width = 130, height = 32) {
       const pts = series.map((v, i) => ({ v, i }));
       const valid = pts.filter((p) => p.v !== null);
@@ -370,7 +405,12 @@ app.get("/admin", async (req, res) => {
       const xStep = width / (series.length - 1);
       const y = (v) => height - 4 - ((v - min) / range) * (height - 8);
       // Draw a continuous line through valid points; gaps span over null buckets
-      const path = valid.map((p, i) => `${i === 0 ? "M" : "L"} ${(p.i * xStep).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+      const path = valid
+        .map(
+          (p, i) =>
+            `${i === 0 ? "M" : "L"} ${(p.i * xStep).toFixed(1)} ${y(p.v).toFixed(1)}`,
+        )
+        .join(" ");
       const lastPt = valid[valid.length - 1];
       return `<svg width="${width}" height="${height}" style="display:block;margin-top:6px;overflow:visible;" viewBox="0 0 ${width} ${height}">
         <path d="${path}" stroke="${color}" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round" />
@@ -389,7 +429,11 @@ app.get("/admin", async (req, res) => {
         locStats.set(k, {
           location_id: k,
           franchise_name: meta.franchise_name || k,
-          consults: 0, scoredCount: 0, scoreSum: 0, closeCount: 0, lastDate: null,
+          consults: 0,
+          scoredCount: 0,
+          scoreSum: 0,
+          closeCount: 0,
+          lastDate: null,
         });
       }
       const ls = locStats.get(k);
@@ -403,73 +447,203 @@ app.get("/admin", async (req, res) => {
       const d = new Date(r.recorded_at).getTime();
       if (!ls.lastDate || d > ls.lastDate) ls.lastDate = d;
     }
-    const leaderboard = Array.from(locStats.values()).map((l) => ({
-      ...l,
-      avgScore: l.scoredCount ? Math.round(l.scoreSum / l.scoredCount) : null,
-      closeRate: l.scoredCount ? Math.round((l.closeCount / l.scoredCount) * 100) : null,
-    })).sort((a, b) => {
-      // Locations with data come first, weakest avg first; locations without data last.
-      if (a.avgScore === null && b.avgScore === null) return b.consults - a.consults;
-      if (a.avgScore === null) return 1;
-      if (b.avgScore === null) return -1;
-      return a.avgScore - b.avgScore;
-    });
+    const leaderboard = Array.from(locStats.values())
+      .map((l) => ({
+        ...l,
+        avgScore: l.scoredCount ? Math.round(l.scoreSum / l.scoredCount) : null,
+        closeRate: l.scoredCount
+          ? Math.round((l.closeCount / l.scoredCount) * 100)
+          : null,
+      }))
+      .sort((a, b) => {
+        // Locations with data come first, weakest avg first; locations without data last.
+        if (a.avgScore === null && b.avgScore === null)
+          return b.consults - a.consults;
+        if (a.avgScore === null) return 1;
+        if (b.avgScore === null) return -1;
+        return a.avgScore - b.avgScore;
+      });
     const activeLocations = leaderboard.filter((l) => l.consults > 0).length;
 
     // Recurring coaching themes — keyword scan across overall_coaching + per-section coaching + explainers.
     // Each theme: a display name and an array of regex/phrase patterns. A scorecard counts ONCE per theme
     // even if multiple patterns match (so the count = # of consults exhibiting the issue).
     const themes = [
-      { name: "Skipped 'Make sense?' close on sit-down", patterns: [/make sense\??\s*(close|check|micro)/i, /skipped (the )?['"]?make sense/i, /missed (the )?['"]?make sense/i, /didn'?t (say|use|land) ['"]?make sense/i] },
-      { name: "Offered discount before isolating cost (skipped Deaf Ear)", patterns: [/(coupon|discount).{0,40}(too early|before.{0,30}(deaf ear|isolat))/i, /skipped (the )?deaf ear/i, /didn'?t run (the )?deaf ear/i, /led with (the )?(coupon|discount)/i, /jump(ed|ing) to (the )?coupon/i] },
-      { name: "Permission-seeking instead of assumptive close", patterns: [/permission.?seeking/i, /['"]?(would|do) you (like to|want to)['"]?.{0,50}(instead|rather than|permission)/i, /not assumptive/i] },
-      { name: "Accepted 'let me think about it' without re-closing", patterns: [/accept(ed|ing) ['"]?(let me think|I'?ll come back|I need to think)/i, /didn'?t re-?close/i, /let (her|him|them) walk/i, /didn'?t push back/i] },
-      { name: "Didn't run tie-downs after buying signals", patterns: [/skipped (the )?tie.?down/i, /missed (the )?tie.?down/i, /didn'?t run (the )?tie.?down/i, /no tie.?down/i, /buying signal.{0,40}(missed|skipped|ignored)/i] },
-      { name: "Didn't offer PIF after close", patterns: [/didn'?t (offer|run) (the )?pif/i, /skipped (the )?pif/i, /missed (the )?pif/i, /no pif (close|offer)/i] },
-      { name: "Didn't collect referrals", patterns: [/didn'?t (collect|ask for|run) referrals?/i, /skipped (the )?referral/i, /missed (the )?referral/i, /no referral collect/i] },
-      { name: "Closed (or attempted to) while standing", patterns: [/clos(ed|ing) (while )?standing/i, /didn'?t sit down/i, /never sat down/i, /standing close/i] },
-      { name: "Used Google Review Drop too early", patterns: [/google review.{0,30}(too early|before.{0,30}(coupon|deaf ear))/i, /jump(ed|ing) to (the )?google review/i, /led with (the )?google review/i] },
-      { name: "Didn't present all 3 tiers", patterns: [/didn'?t (present|show) all (3|three) tiers/i, /skipped (a )?tier/i, /only (presented|showed) (one|two)/i, /missed (a )?tier/i] },
-      { name: "Skipped 'By The Way' close on free pass", patterns: [/skipped (the )?by the way/i, /missed (the )?by the way/i, /didn'?t use (the )?by the way/i, /no by the way close/i] },
+      {
+        name: "Skipped 'Make sense?' close on sit-down",
+        patterns: [
+          /make sense\??\s*(close|check|micro)/i,
+          /skipped (the )?['"]?make sense/i,
+          /missed (the )?['"]?make sense/i,
+          /didn'?t (say|use|land) ['"]?make sense/i,
+        ],
+      },
+      {
+        name: "Offered discount before isolating cost (skipped Deaf Ear)",
+        patterns: [
+          /(coupon|discount).{0,40}(too early|before.{0,30}(deaf ear|isolat))/i,
+          /skipped (the )?deaf ear/i,
+          /didn'?t run (the )?deaf ear/i,
+          /led with (the )?(coupon|discount)/i,
+          /jump(ed|ing) to (the )?coupon/i,
+        ],
+      },
+      {
+        name: "Permission-seeking instead of assumptive close",
+        patterns: [
+          /permission.?seeking/i,
+          /['"]?(would|do) you (like to|want to)['"]?.{0,50}(instead|rather than|permission)/i,
+          /not assumptive/i,
+        ],
+      },
+      {
+        name: "Accepted 'let me think about it' without re-closing",
+        patterns: [
+          /accept(ed|ing) ['"]?(let me think|I'?ll come back|I need to think)/i,
+          /didn'?t re-?close/i,
+          /let (her|him|them) walk/i,
+          /didn'?t push back/i,
+        ],
+      },
+      {
+        name: "Didn't run tie-downs after buying signals",
+        patterns: [
+          /skipped (the )?tie.?down/i,
+          /missed (the )?tie.?down/i,
+          /didn'?t run (the )?tie.?down/i,
+          /no tie.?down/i,
+          /buying signal.{0,40}(missed|skipped|ignored)/i,
+        ],
+      },
+      {
+        name: "Didn't offer PIF after close",
+        patterns: [
+          /didn'?t (offer|run) (the )?pif/i,
+          /skipped (the )?pif/i,
+          /missed (the )?pif/i,
+          /no pif (close|offer)/i,
+        ],
+      },
+      {
+        name: "Didn't collect referrals",
+        patterns: [
+          /didn'?t (collect|ask for|run) referrals?/i,
+          /skipped (the )?referral/i,
+          /missed (the )?referral/i,
+          /no referral collect/i,
+        ],
+      },
+      {
+        name: "Closed (or attempted to) while standing",
+        patterns: [
+          /clos(ed|ing) (while )?standing/i,
+          /didn'?t sit down/i,
+          /never sat down/i,
+          /standing close/i,
+        ],
+      },
+      {
+        name: "Used Google Review Drop too early",
+        patterns: [
+          /google review.{0,30}(too early|before.{0,30}(coupon|deaf ear))/i,
+          /jump(ed|ing) to (the )?google review/i,
+          /led with (the )?google review/i,
+        ],
+      },
+      {
+        name: "Didn't present all 3 tiers",
+        patterns: [
+          /didn'?t (present|show) all (3|three) tiers/i,
+          /skipped (a )?tier/i,
+          /only (presented|showed) (one|two)/i,
+          /missed (a )?tier/i,
+        ],
+      },
+      {
+        name: "Skipped 'By The Way' close on free pass",
+        patterns: [
+          /skipped (the )?by the way/i,
+          /missed (the )?by the way/i,
+          /didn'?t use (the )?by the way/i,
+          /no by the way close/i,
+        ],
+      },
     ];
-    const themeCounts = themes.map((t) => {
-      let count = 0;
-      for (const sc of scored) {
-        const hay = [
-          sc.overall_coaching, sc.coaching_note, sc.process_warning,
-          sc.sitdown_score_explainer, sc.objection_score_explainer, sc.language_score_explainer, sc.close_score_explainer,
-          sc.sitdown_coaching, sc.objection_coaching, sc.language_coaching, sc.close_coaching,
-        ].filter(Boolean).join(" ");
-        if (t.patterns.some((p) => p.test(hay))) count++;
-      }
-      const pct = scored.length ? Math.round((count / scored.length) * 100) : 0;
-      return { name: t.name, count, pct };
-    }).filter((t) => t.count > 0).sort((a, b) => b.count - a.count).slice(0, 8);
+    const themeCounts = themes
+      .map((t) => {
+        let count = 0;
+        for (const sc of scored) {
+          const hay = [
+            sc.overall_coaching,
+            sc.coaching_note,
+            sc.process_warning,
+            sc.sitdown_score_explainer,
+            sc.objection_score_explainer,
+            sc.language_score_explainer,
+            sc.close_score_explainer,
+            sc.sitdown_coaching,
+            sc.objection_coaching,
+            sc.language_coaching,
+            sc.close_coaching,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          if (t.patterns.some((p) => p.test(hay))) count++;
+        }
+        const pct = scored.length
+          ? Math.round((count / scored.length) * 100)
+          : 0;
+        return { name: t.name, count, pct };
+      })
+      .filter((t) => t.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
 
-    const fmtDate = (d) => new Date(d).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const fmtDate = (d) =>
+      new Date(d).toLocaleString("en-US", {
+        timeZone: "America/Chicago",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
     const fmtDuration = (sec) => Math.round(sec / 60) + "m " + (sec % 60) + "s";
 
     const scorePill = (sc) => {
       if (!sc) return '<span style="color:#9CA3AF;font-size:12px;">—</span>';
       const score = sc.total_score;
-      const color = score >= 70 ? "#00AEEF" : score >= 50 ? "#0284C7" : "#DC2626";
+      const color =
+        score >= 70 ? "#00AEEF" : score >= 50 ? "#0284C7" : "#DC2626";
       return `<a href="/scorecard/${sc.recording_id}" target="_blank" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
     };
 
     const statusPill = (status) => {
       const s = status || "pending";
-      let bg = "#F3F4F6", color = "#6B7280", border = "#E5E7EB";
-      if (s === "transcribing" || s === "scoring" || s === "transcribed") { bg = "#E0F4FB"; color = "#0284C7"; border = "#BAE6FD"; }
-      else if (s === "scored") { bg = "#0A0A0A"; color = "#fff"; border = "#0A0A0A"; }
-      else if (s === "failed") { bg = "#FEE2E2"; color = "#DC2626"; border = "#FECACA"; }
+      let bg = "#F3F4F6",
+        color = "#6B7280",
+        border = "#E5E7EB";
+      if (s === "transcribing" || s === "scoring" || s === "transcribed") {
+        bg = "#E0F4FB";
+        color = "#0284C7";
+        border = "#BAE6FD";
+      } else if (s === "scored") {
+        bg = "#0A0A0A";
+        color = "#fff";
+        border = "#0A0A0A";
+      } else if (s === "failed") {
+        bg = "#FEE2E2";
+        color = "#DC2626";
+        border = "#FECACA";
+      }
       return `<span style="display:inline-block;padding:3px 10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">${s}</span>`;
     };
 
-    const rows = recordings.map((r) => {
-      const sc = scorecardMap[r.recording_id];
-      const loc = byLocationId[r.location_id] || {};
-      const name = r.contact_name || r.appointment_id;
-      return `<tr>
+    const rows = recordings
+      .map((r) => {
+        const sc = scorecardMap[r.recording_id];
+        const loc = byLocationId[r.location_id] || {};
+        const name = r.contact_name || r.appointment_id;
+        return `<tr>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDate(r.recorded_at)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#111827;font-weight:600;">${loc.franchise_name || r.location_id}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#374151;">${name}</td>
@@ -478,7 +652,8 @@ app.get("/admin", async (req, res) => {
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${scorePill(sc)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="/playback/${r.recording_id}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
 
     const html = `<!DOCTYPE html><html><head><title>Aira Admin</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -542,7 +717,7 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="subhead"><div class="subhead-inner">
   <div class="eyebrow">Consult Recorder</div>
   <div class="title">Admin Dashboard</div>
-  <div class="subtitle">Live view of all consultation recordings and scoring</div>
+  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a></div>
 </div></div>
 <div class="wrap">
   <div class="kpi-grid">
@@ -569,7 +744,10 @@ tbody tr:hover{background:#F9FAFB;}
       <div class="panel-eyebrow">Per-Location Leaderboard</div>
       <div class="panel-sub">${activeLocations} active location${activeLocations === 1 ? "" : "s"} — weakest avg score first. Click a row to filter.</div>
     </div>
-    ${leaderboard.length === 0 ? '<div class="panel-empty">No locations recorded yet.</div>' : `
+    ${
+      leaderboard.length === 0
+        ? '<div class="panel-empty">No locations recorded yet.</div>'
+        : `
     <table class="lb-table">
       <thead><tr>
         <th style="text-align:left;">Location</th>
@@ -580,11 +758,32 @@ tbody tr:hover{background:#F9FAFB;}
         <th>Last Activity</th>
       </tr></thead>
       <tbody>
-      ${leaderboard.map((l) => {
-        const scoreColor = l.avgScore === null ? "#9CA3AF" : l.avgScore >= 70 ? "#00AEEF" : l.avgScore >= 50 ? "#0284C7" : "#DC2626";
-        const rateColor = l.closeRate === null ? "#9CA3AF" : l.closeRate >= 30 ? "#00AEEF" : l.closeRate >= 15 ? "#0284C7" : "#DC2626";
-        const lastDate = l.lastDate ? new Date(l.lastDate).toLocaleDateString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric" }) : "—";
-        return `<tr>
+      ${leaderboard
+        .map((l) => {
+          const scoreColor =
+            l.avgScore === null
+              ? "#9CA3AF"
+              : l.avgScore >= 70
+                ? "#00AEEF"
+                : l.avgScore >= 50
+                  ? "#0284C7"
+                  : "#DC2626";
+          const rateColor =
+            l.closeRate === null
+              ? "#9CA3AF"
+              : l.closeRate >= 30
+                ? "#00AEEF"
+                : l.closeRate >= 15
+                  ? "#0284C7"
+                  : "#DC2626";
+          const lastDate = l.lastDate
+            ? new Date(l.lastDate).toLocaleDateString("en-US", {
+                timeZone: "America/Chicago",
+                month: "short",
+                day: "numeric",
+              })
+            : "—";
+          return `<tr>
           <td style="text-align:left;">
             <div style="font-size:13px;font-weight:700;color:#111827;">${l.franchise_name}</div>
             <div style="font-size:11px;color:#6B7280;">${l.location_id}</div>
@@ -595,9 +794,11 @@ tbody tr:hover{background:#F9FAFB;}
           <td>${l.avgScore === null ? '<span style="color:#D1D5DB;">—</span>' : `<span style="font-size:14px;font-weight:800;color:${scoreColor};">${l.avgScore}<span style="font-size:11px;color:#9CA3AF;font-weight:600;"> /100</span></span>`}</td>
           <td><span style="font-size:12px;color:#6B7280;">${lastDate}</span></td>
         </tr>`;
-      }).join("")}
+        })
+        .join("")}
       </tbody>
-    </table>`}
+    </table>`
+    }
   </div>
 
   <div class="insights">
@@ -606,17 +807,24 @@ tbody tr:hover{background:#F9FAFB;}
         <div class="panel-eyebrow">Average Score by Category</div>
         <div class="panel-sub">${scored.length} scored consult${scored.length === 1 ? "" : "s"} — weakest categories first</div>
       </div>
-      ${scored.length === 0 ? '<div class="panel-empty">No scored consults yet.</div>' : catStats.map((c) => {
-        const pct = (c.avg / 25) * 100;
-        const color = pct >= 80 ? "#00AEEF" : pct >= 60 ? "#0284C7" : "#DC2626";
-        return `<div class="cat-row">
+      ${
+        scored.length === 0
+          ? '<div class="panel-empty">No scored consults yet.</div>'
+          : catStats
+              .map((c) => {
+                const pct = (c.avg / 25) * 100;
+                const color =
+                  pct >= 80 ? "#00AEEF" : pct >= 60 ? "#0284C7" : "#DC2626";
+                return `<div class="cat-row">
           <div class="cat-row-head">
             <div class="cat-label">${c.label}</div>
             <div class="cat-score" style="color:${color};">${c.avg}<span style="color:#9CA3AF;font-weight:600;"> / 25</span></div>
           </div>
           <div class="cat-bar"><div class="cat-bar-fill" style="background:${color};width:${pct}%;"></div></div>
         </div>`;
-      }).join("")}
+              })
+              .join("")
+      }
     </div>
 
     <div class="card panel">
@@ -624,9 +832,14 @@ tbody tr:hover{background:#F9FAFB;}
         <div class="panel-eyebrow">Top Coaching Themes</div>
         <div class="panel-sub">Recurring mistakes detected across coaching notes — train these first</div>
       </div>
-      ${themeCounts.length === 0 ? '<div class="panel-empty">No recurring themes detected yet.</div>' : themeCounts.map((t, i) => {
-        const sev = t.pct >= 50 ? "#DC2626" : t.pct >= 25 ? "#0284C7" : "#00AEEF";
-        return `<div class="theme-row">
+      ${
+        themeCounts.length === 0
+          ? '<div class="panel-empty">No recurring themes detected yet.</div>'
+          : themeCounts
+              .map((t, i) => {
+                const sev =
+                  t.pct >= 50 ? "#DC2626" : t.pct >= 25 ? "#0284C7" : "#00AEEF";
+                return `<div class="theme-row">
           <div class="theme-rank" style="color:${sev};">${i + 1}</div>
           <div class="theme-body">
             <div class="theme-name">${t.name}</div>
@@ -634,7 +847,9 @@ tbody tr:hover{background:#F9FAFB;}
           </div>
           <div class="theme-count" style="color:${sev};">${t.count}<span style="color:#9CA3AF;font-weight:600;font-size:11px;"> / ${scored.length}</span></div>
         </div>`;
-      }).join("")}
+              })
+              .join("")
+      }
     </div>
   </div>
 
@@ -660,17 +875,272 @@ tbody tr:hover{background:#F9FAFB;}
   }
 });
 
+app.get("/admin/library", async (req, res) => {
+  try {
+    const recordings = await db.getAllRecordings();
+    const scorecards = await db.getAllScorecards();
+    const latestByRec = new Map();
+    for (const sc of scorecards) {
+      const prev = latestByRec.get(sc.recording_id);
+      if (!prev || new Date(sc.created_at) > new Date(prev.created_at))
+        latestByRec.set(sc.recording_id, sc);
+    }
+
+    // Prospect objection patterns — what the prospect SAYS, scanned against transcripts.
+    const objections = [
+      {
+        id: "think",
+        name: "“I need to think about it”",
+        patterns: [
+          /\bI(?:'| a)?(?:m|\s+a)?\s*(?:need|want|got)?(?:ta| to)?\s*think (?:about it|on it|it over)\b/i,
+          /\blet me think\b/i,
+          /\bI(?:'?ll| will) think (?:about|on)\b/i,
+        ],
+      },
+      {
+        id: "spouse",
+        name: "“I need to talk to my spouse”",
+        patterns: [
+          /\btalk to my (wife|husband|spouse|partner|boyfriend|girlfriend|man|woman)\b/i,
+          /\bask my (wife|husband|spouse|partner)\b/i,
+          /\bcheck with my (wife|husband|spouse|partner)\b/i,
+        ],
+      },
+      {
+        id: "afford",
+        name: "“I can't afford it” / “too expensive”",
+        patterns: [
+          /\bcan'?t afford\b/i,
+          /\b(too|kinda|kind of) (expensive|pricey|much)\b/i,
+          /\bout of (my )?budget\b/i,
+          /\bdon'?t have the money\b/i,
+          /\bmoney('?s)? tight\b/i,
+        ],
+      },
+      {
+        id: "trial",
+        name: "“Can I try it first?” / free pass",
+        patterns: [
+          /\btry (it|the gym) (out|first)\b/i,
+          /\b(free|day|guest|trial)\s*(pass|day)\b/i,
+          /\bcome (back|in) (and )?(try|test)\b/i,
+        ],
+      },
+      {
+        id: "later",
+        name: "“I'll come back later” / “next week”",
+        patterns: [
+          /\bcome back (later|tomorrow|on |next|in|after)\b/i,
+          /\bI'?ll be back\b/i,
+          /\b(later|next) (this )?(week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+          /\b(stop|come) (back|by) (later|tomorrow)\b/i,
+        ],
+      },
+      {
+        id: "shopping",
+        name: "“I'm just looking around” / shopping other gyms",
+        patterns: [
+          /\bjust (looking|browsing|checking)\b/i,
+          /\b(checking out|shopping|comparing) (a few|other|several|some) (gyms|places)\b/i,
+          /\bgoing to (look at|check out) (a )?(few|other|some|another)\b/i,
+        ],
+      },
+      {
+        id: "payday",
+        name: "“I just got paid / next paycheck” (timing-based)",
+        patterns: [
+          /\b(don'?t get paid|get paid) (on|till|until|next|on the)\b/i,
+          /\bnext (paycheck|pay\s*day|pay period)\b/i,
+          /\bpaid (on |the )?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|1st|15th|first|fifteenth)\b/i,
+          /\bafter pay ?day\b/i,
+          /\bbroke (until|till)\b/i,
+        ],
+      },
+    ];
+
+    const stripTags = (s) => (s || "").replace(/<[^>]+>/g, "");
+    const excerpt = (transcript, idx, len) => {
+      const start = Math.max(0, idx - 140);
+      const end = Math.min(transcript.length, idx + len + 280);
+      let text = transcript.slice(start, end);
+      if (start > 0) text = "… " + text.replace(/^\S*\s/, "");
+      if (end < transcript.length) text = text.replace(/\s\S*$/, "") + " …";
+      // Highlight the matched phrase
+      const matchTxt = transcript.slice(idx, idx + len);
+      const safeMatch = matchTxt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return text.replace(
+        new RegExp(safeMatch, "i"),
+        `<mark style="background:#FEF3C7;padding:0 2px;border-radius:2px;color:#92400E;font-weight:600;">${matchTxt}</mark>`,
+      );
+    };
+
+    // For each objection, find every match across transcripts and pair with the scorecard.
+    const buckets = objections.map((o) => ({ ...o, hits: [] }));
+    for (const rec of recordings) {
+      if (!rec.transcript) continue;
+      const sc = latestByRec.get(rec.recording_id);
+      if (!sc) continue;
+      const loc = byLocationId[rec.location_id] || {};
+      for (const b of buckets) {
+        for (const p of b.patterns) {
+          const m = rec.transcript.match(p);
+          if (m && m.index != null) {
+            b.hits.push({
+              recording_id: rec.recording_id,
+              franchise_name: loc.franchise_name || rec.location_id,
+              recorded_at: rec.recorded_at,
+              total_score: sc.total_score,
+              did_close: sc.did_close === true,
+              ai_summary: sc.ai_summary || "",
+              excerpt: excerpt(rec.transcript, m.index, m[0].length),
+            });
+            break; // one hit per recording per bucket
+          }
+        }
+      }
+    }
+
+    // For each bucket, pick best closed + worst not-closed pair (or top examples if only one side present).
+    const sections = buckets
+      .map((b) => {
+        const closed = b.hits
+          .filter((h) => h.did_close)
+          .sort((a, b) => b.total_score - a.total_score)
+          .slice(0, 2);
+        const notClosed = b.hits
+          .filter((h) => !h.did_close)
+          .sort((a, b) => a.total_score - b.total_score)
+          .slice(0, 2);
+        return { ...b, closed, notClosed };
+      })
+      .filter((s) => s.closed.length + s.notClosed.length > 0);
+
+    const renderCard = (h, isClose) => {
+      const accent = isClose ? "#00AEEF" : "#DC2626";
+      const label = isClose ? "✓ CLOSED" : "✗ NO SALE";
+      const date = new Date(h.recorded_at).toLocaleDateString("en-US", {
+        timeZone: "America/Chicago",
+        month: "short",
+        day: "numeric",
+      });
+      return `<a href="/scorecard/${h.recording_id}" target="_blank" style="display:block;text-decoration:none;color:inherit;">
+        <div class="pair-card" style="border-left:4px solid ${accent};">
+          <div class="pair-head">
+            <div class="pair-label" style="color:${accent};">${label}</div>
+            <div class="pair-meta">${h.franchise_name} · ${date} · <span style="color:${accent};font-weight:800;">${h.total_score}/100</span></div>
+          </div>
+          <div class="pair-excerpt">${h.excerpt}</div>
+          <div class="pair-summary">${stripTags(h.ai_summary)}</div>
+          <div class="pair-cta">View full scorecard →</div>
+        </div>
+      </a>`;
+    };
+
+    const html = `<!DOCTYPE html><html><head><title>Aira Library — Best/Worst Pairs</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
+a{color:#0284C7;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:24px 28px;}
+.subhead-inner{max-width:1100px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
+.subtitle{font-size:13px;color:#6B7280;margin-top:4px;}
+.wrap{max-width:1100px;margin:0 auto;padding:24px;}
+.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;margin-bottom:16px;font-weight:600;}
+.back:hover{color:#0A0A0A;}
+.objection{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:22px 24px;margin-bottom:20px;}
+.objection-head{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #F3F4F6;}
+.objection-quote{font-size:18px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;line-height:1.3;}
+.objection-meta{font-size:12px;color:#6B7280;margin-top:4px;}
+.pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:760px){.pair-grid{grid-template-columns:1fr;}}
+.pair-col-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px;}
+.pair-card{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:16px 18px;margin-bottom:12px;transition:background .15s;}
+.pair-card:hover{background:#F3F4F6;}
+.pair-head{margin-bottom:10px;}
+.pair-label{font-size:10px;font-weight:900;letter-spacing:.14em;}
+.pair-meta{font-size:12px;color:#6B7280;margin-top:3px;}
+.pair-excerpt{font-size:13px;color:#374151;line-height:1.6;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:12px 14px;font-style:italic;}
+.pair-summary{font-size:12px;color:#6B7280;line-height:1.5;margin-top:10px;}
+.pair-cta{font-size:11px;color:#0284C7;font-weight:700;margin-top:10px;text-transform:uppercase;letter-spacing:.08em;}
+.empty{padding:18px;text-align:center;color:#9CA3AF;font-size:13px;font-style:italic;}
+.intro{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:13px;color:#374151;line-height:1.6;}
+.intro b{color:#0A0A0A;}
+</style></head><body>
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">Training Library</div>
+  <div class="title">Best vs Worst — Real Consults</div>
+  <div class="subtitle">For each common objection, see one rep who closed it and one who didn't. Pulled from real recordings.</div>
+</div></div>
+<div class="wrap">
+  <a href="/admin" class="back">← Back to Admin</a>
+  <div class="intro"><b>How to use:</b> Pick an objection. Read the closed example, read the no-sale example. Notice what changed between them. Click any card to see the full transcript and coaching note.</div>
+  ${
+    sections.length === 0
+      ? '<div class="objection"><div class="empty">Not enough scored recordings yet to build pairs. Library populates as the corpus grows.</div></div>'
+      : sections
+          .map(
+            (s) => `
+    <div class="objection">
+      <div class="objection-head">
+        <div class="objection-quote">${s.name}</div>
+        <div class="objection-meta">${s.hits.length} consult${s.hits.length === 1 ? "" : "s"} where this objection came up</div>
+      </div>
+      <div class="pair-grid">
+        <div>
+          <div class="pair-col-label" style="color:#00AEEF;">✓ They closed it</div>
+          ${s.closed.length === 0 ? '<div class="pair-card empty">No closed example yet for this objection.</div>' : s.closed.map((h) => renderCard(h, true)).join("")}
+        </div>
+        <div>
+          <div class="pair-col-label" style="color:#DC2626;">✗ They lost the sale</div>
+          ${s.notClosed.length === 0 ? '<div class="pair-card empty">No no-sale example yet for this objection.</div>' : s.notClosed.map((h) => renderCard(h, false)).join("")}
+        </div>
+      </div>
+    </div>
+  `,
+          )
+          .join("")
+  }
+</div>
+</body></html>`;
+    res.send(html);
+  } catch (err) {
+    console.error("[Library] Error:", err.message);
+    res.status(500).send("Error loading library: " + err.message);
+  }
+});
+
 app.get("/scorecard/:id", async (req, res) => {
   try {
     const r = await db.getRecording(req.params.id);
     if (!r) return res.status(404).send("Recording not found");
     const s = await db.getScorecardByRecording(req.params.id);
-    if (!s) return res.status(404).send("Scorecard not yet available — check back after processing completes.");
+    if (!s)
+      return res
+        .status(404)
+        .send(
+          "Scorecard not yet available — check back after processing completes.",
+        );
     const { byLocationId } = require("./locations");
     const loc = byLocationId[r.location_id] || {};
     const name = r.contact_name || r.appointment_id;
-    const date = new Date(r.recorded_at).toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "long", month: "long", day: "numeric", year: "numeric" });
-    const scoreColor = s.total_score >= 70 ? "#00AEEF" : s.total_score >= 50 ? "#0284C7" : "#DC2626";
+    const date = new Date(r.recorded_at).toLocaleDateString("en-US", {
+      timeZone: "America/Chicago",
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+    const scoreColor =
+      s.total_score >= 70
+        ? "#00AEEF"
+        : s.total_score >= 50
+          ? "#0284C7"
+          : "#DC2626";
     const sections = [
       ["Sit-Down Presentation", s.sitdown_score, s.sitdown_score_explainer],
       ["Objection Handling", s.objection_score, s.objection_score_explainer],
@@ -691,9 +1161,10 @@ app.get("/scorecard/:id", async (req, res) => {
         ${explainer ? `<div style="font-size:13px;color:#6B7280;line-height:1.55;margin:6px 0 14px;">${explainer}</div>` : '<div style="margin-bottom:14px;"></div>'}
       </div>`;
     };
-    const closedBadge = s.did_close === true
-      ? `<div style="display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;"><span style="color:#00AEEF;">✓</span> Sale Closed</div>`
-      : "";
+    const closedBadge =
+      s.did_close === true
+        ? `<div style="display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;"><span style="color:#00AEEF;">✓</span> Sale Closed</div>`
+        : "";
 
     res.send(`<!DOCTYPE html><html><head><title>Scorecard — ${name}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -749,14 +1220,22 @@ a{color:#0284C7;}
   <div class="card section-block">
     ${sections.map(sectionRow).join("")}
   </div>
-  ${s.overall_coaching || s.coaching_note ? `<div class="coaching">
+  ${
+    s.overall_coaching || s.coaching_note
+      ? `<div class="coaching">
     <div class="coaching-header">Coaching Notes</div>
-    <div class="coaching-body"><p>${(s.overall_coaching || s.coaching_note).replace(/\n\n+/g, '</p><p>').replace(/\n/g, " ")}</p></div>
-  </div>` : ""}
-  ${r.transcript ? `<div class="card">
+    <div class="coaching-body"><p>${(s.overall_coaching || s.coaching_note).replace(/\n\n+/g, "</p><p>").replace(/\n/g, " ")}</p></div>
+  </div>`
+      : ""
+  }
+  ${
+    r.transcript
+      ? `<div class="card">
     <div class="section-title">Full Transcript</div>
     <div class="transcript">${r.transcript}</div>
-  </div>` : ""}
+  </div>`
+      : ""
+  }
 </div>
 </body></html>`);
   } catch (err) {
@@ -770,7 +1249,9 @@ app.get("/playback/:recording_id", async (req, res) => {
   if (!rec || !rec.audio_file_url) return res.status(404).send("Not found");
   const name = rec.contact_name || rec.appointment_id;
   const loc = byLocationId[rec.location_id] || {};
-  const dt = new Date(rec.recorded_at).toLocaleString("en-US", { timeZone: "America/Chicago" });
+  const dt = new Date(rec.recorded_at).toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+  });
   res.send(`<!DOCTYPE html><html><head><title>Playback — ${name}</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
@@ -802,10 +1283,14 @@ audio{width:100%;}
     <div class="section-title">Audio</div>
     <audio controls><source src="/audio/${path.basename(rec.audio_file_url)}"></audio>
   </div>
-  ${rec.transcript ? `<div class="card">
+  ${
+    rec.transcript
+      ? `<div class="card">
     <div class="section-title">Transcript</div>
     <div class="transcript">${rec.transcript}</div>
-  </div>` : `<div class="card"><div style="color:#9CA3AF;font-size:13px;">No transcript yet</div></div>`}
+  </div>`
+      : `<div class="card"><div style="color:#9CA3AF;font-size:13px;">No transcript yet</div></div>`
+  }
 </div>
 </body></html>`);
 });
