@@ -341,6 +341,116 @@ function adminAuth(req, res, next) {
   return res.status(401).send("Authentication required");
 }
 
+// ─────────── Date range helper for /admin and /admin/location/:id ───────────
+// Accepts ?range=this_month|last_month|30d|90d|all|custom (+ ?from=&to= for custom).
+// Returns the current window AND a previous-period window for delta comparison.
+function parseRange(req) {
+  const range = String(req.query.range || "all").toLowerCase();
+  const now = new Date();
+  const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
+  let from = null,
+    to = null,
+    prevFrom = null,
+    prevTo = null,
+    label = "All Time",
+    prevLabel = null;
+
+  if (range === "this_month") {
+    from = startOfMonth(now);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevTo = from;
+    label = "This Month";
+    prevLabel = "vs last month";
+  } else if (range === "last_month") {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to = startOfMonth(now);
+    prevFrom = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    prevTo = from;
+    label = "Last Month";
+    prevLabel = "vs the month before";
+  } else if (range === "30d") {
+    to = now;
+    from = new Date(now.getTime() - 30 * 86400000);
+    prevTo = from;
+    prevFrom = new Date(prevTo.getTime() - 30 * 86400000);
+    label = "Last 30 Days";
+    prevLabel = "vs prior 30 days";
+  } else if (range === "90d") {
+    to = now;
+    from = new Date(now.getTime() - 90 * 86400000);
+    prevTo = from;
+    prevFrom = new Date(prevTo.getTime() - 90 * 86400000);
+    label = "Last 90 Days";
+    prevLabel = "vs prior 90 days";
+  } else if (range === "custom" && req.query.from && req.query.to) {
+    from = new Date(req.query.from);
+    to = new Date(new Date(req.query.to).getTime() + 86400000); // inclusive end
+    const span = to - from;
+    prevTo = from;
+    prevFrom = new Date(from.getTime() - span);
+    label = `${req.query.from} → ${req.query.to}`;
+    prevLabel = "vs prior period";
+  }
+
+  const inRange = (d) => {
+    if (!from || !to) return true;
+    const t = new Date(d).getTime();
+    return t >= from.getTime() && t < to.getTime();
+  };
+  const inPrev = (d) => {
+    if (!prevFrom || !prevTo) return false;
+    const t = new Date(d).getTime();
+    return t >= prevFrom.getTime() && t < prevTo.getTime();
+  };
+
+  return {
+    range,
+    from,
+    to,
+    prevFrom,
+    prevTo,
+    label,
+    prevLabel,
+    inRange,
+    inPrev,
+  };
+}
+
+// Renders the pill bar for switching ranges. Active pill is colored.
+function rangeSelectorHtml(currentRange, baseUrl) {
+  const opts = [
+    { v: "this_month", label: "This Month" },
+    { v: "last_month", label: "Last Month" },
+    { v: "30d", label: "30 Days" },
+    { v: "90d", label: "90 Days" },
+    { v: "all", label: "All Time" },
+  ];
+  const sep = baseUrl.includes("?") ? "&" : "?";
+  return `<div class="range-bar">
+    ${opts
+      .map((o) => {
+        const active = o.v === currentRange;
+        const url = `${baseUrl}${sep}range=${o.v}`;
+        return `<a href="${url}" class="range-pill${active ? " active" : ""}">${o.label}</a>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+// Render a delta vs previous period as an arrow + signed number.
+function deltaHtml(current, prev, suffix = "", invert = false) {
+  if (prev === null || prev === undefined) return "";
+  const diff = current - prev;
+  if (diff === 0) return `<div class="kpi-delta neutral">no change</div>`;
+  const isUp = diff > 0;
+  const isGood = invert ? !isUp : isUp;
+  const cls = isGood ? "good" : "bad";
+  const arrow = isUp ? "↑" : "↓";
+  const sign = isUp ? "+" : "";
+  return `<div class="kpi-delta ${cls}">${arrow} ${sign}${diff}${suffix}</div>`;
+}
+
 app.get("/admin", adminAuth, async (req, res) => {
   try {
     const recordings = await db.getAllRecordings();
@@ -351,19 +461,43 @@ app.get("/admin", adminAuth, async (req, res) => {
     });
     const connectedTablets = Array.from(tabletConnections.keys());
 
+    // ─── Date range filter (with previous-period comparison) ───
+    const period = parseRange(req);
+
     // ─── Analytics ───
-    // Every scorecard insert is preserved in the DB forever (no deletes anywhere — historical
-    // re-scores stay around so we can use them for training, flashcards, regression testing).
-    // For LIVE dashboard math we want one row per recording (the most recent), so rescores
-    // don't double-count toward avg score / themes / leaderboard.
+    // Every scorecard insert is preserved in the DB forever. For LIVE dashboard math
+    // we want one row per recording (the most recent), so rescores don't double-count.
     const latestByRec = new Map();
     for (const sc of scorecards) {
       const prev = latestByRec.get(sc.recording_id);
       if (!prev || new Date(sc.created_at) > new Date(prev.created_at))
         latestByRec.set(sc.recording_id, sc);
     }
-    const scored = Array.from(latestByRec.values());
-    const historicalScorecardCount = scorecards.length; // includes every rescore — never lost
+    const allScored = Array.from(latestByRec.values());
+    const historicalScorecardCount = scorecards.length;
+
+    // Filter scored to current period (by the recording's recorded_at date).
+    const recDateById = new Map(
+      recordings.map((r) => [r.recording_id, r.recorded_at]),
+    );
+    const scoredInPeriod = (sc) => {
+      const d = recDateById.get(sc.recording_id);
+      return d ? period.inRange(d) : true;
+    };
+    const scoredInPrev = (sc) => {
+      const d = recDateById.get(sc.recording_id);
+      return d ? period.inPrev(d) : false;
+    };
+    const scored = allScored.filter(scoredInPeriod);
+    const scoredPrev = allScored.filter(scoredInPrev);
+
+    // Recordings filtered to the current period (used for per-location leaderboard, table)
+    const recordingsInPeriod = recordings.filter((r) =>
+      period.inRange(r.recorded_at),
+    );
+    const recordingsPrev = recordings.filter((r) =>
+      period.inPrev(r.recorded_at),
+    );
 
     const totalCloses = scored.filter((s) => s.did_close === true).length;
     const closeRate = scored.length
@@ -374,31 +508,49 @@ app.get("/admin", adminAuth, async (req, res) => {
           scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length,
         )
       : 0;
-    const avgCat = (key) =>
-      scored.length
+    const avgCat = (key, list) =>
+      list.length
         ? Math.round(
-            (scored.reduce((a, s) => a + (s[key] || 0), 0) / scored.length) *
-              10,
+            (list.reduce((a, s) => a + (s[key] || 0), 0) / list.length) * 10,
           ) / 10
         : 0;
     const catStats = [
-      { label: "Sit-Down", avg: avgCat("sitdown_score"), key: "sitdown_score" },
+      {
+        label: "Sit-Down",
+        avg: avgCat("sitdown_score", scored),
+        key: "sitdown_score",
+      },
       {
         label: "Objection Handling",
-        avg: avgCat("objection_score"),
+        avg: avgCat("objection_score", scored),
         key: "objection_score",
       },
       {
         label: "Language & Psychology",
-        avg: avgCat("language_score"),
+        avg: avgCat("language_score", scored),
         key: "language_score",
       },
       {
         label: "Close Execution",
-        avg: avgCat("close_score"),
+        avg: avgCat("close_score", scored),
         key: "close_score",
       },
     ].sort((a, b) => a.avg - b.avg);
+
+    // Previous-period stats for delta comparison (only when a non-all range is active)
+    const prevTotalCloses = scoredPrev.filter(
+      (s) => s.did_close === true,
+    ).length;
+    const prevCloseRate = scoredPrev.length
+      ? Math.round((prevTotalCloses / scoredPrev.length) * 100)
+      : null;
+    const prevAvgTotal = scoredPrev.length
+      ? Math.round(
+          scoredPrev.reduce((a, s) => a + (s.total_score || 0), 0) /
+            scoredPrev.length,
+        )
+      : null;
+    const showDeltas = period.range !== "all" && period.prevLabel;
 
     // ─── 30-day daily series (for sparklines) ───
     // Pair each latest scorecard with its recording date.
@@ -452,10 +604,9 @@ app.get("/admin", adminAuth, async (req, res) => {
     }
 
     // ─── Per-location leaderboard ───
-    // Aggregate by location_id, hydrate with byLocationId for display name. Include locations
-    // even with 0 scorecards if they have any recordings — VPs want to see all their gyms.
+    // Aggregate by location_id, scoped to the selected period.
     const locStats = new Map();
-    for (const r of recordings) {
+    for (const r of recordingsInPeriod) {
       const k = canonicalLocationId(r.location_id) || "unknown";
       if (!locStats.has(k)) {
         const meta = byLocationId[k] || {};
@@ -671,7 +822,7 @@ app.get("/admin", adminAuth, async (req, res) => {
       return `<span style="display:inline-block;padding:3px 10px;background:${bg};color:${color};border:1px solid ${border};border-radius:9999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">${s}</span>`;
     };
 
-    const rows = recordings
+    const rows = recordingsInPeriod
       .map((r) => {
         const sc = scorecardMap[r.recording_id];
         const loc = byLocationId[r.location_id] || {};
@@ -706,6 +857,16 @@ a{color:#0284C7;}
 .kpi-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
 .kpi-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
 .kpi-foot{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;margin-top:6px;}
+.kpi-delta{font-size:11px;font-weight:800;letter-spacing:.04em;margin-top:8px;display:inline-block;padding:2px 8px;border-radius:9999px;}
+.kpi-delta.good{background:#ECFDF5;color:#15803d;}
+.kpi-delta.bad{background:#FEF3F2;color:#DC2626;}
+.kpi-delta.neutral{background:#F3F4F6;color:#6B7280;}
+.range-bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px;}
+.range-pill{display:inline-block;padding:7px 14px;background:#fff;border:1px solid #E5E7EB;color:#374151;border-radius:9999px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.02em;transition:all .15s;}
+.range-pill:hover{border-color:#0284C7;color:#0284C7;}
+.range-pill.active{background:#0A0A0A;color:#fff;border-color:#0A0A0A;}
+.period-banner{font-size:12px;color:#6B7280;margin-bottom:18px;padding:0 4px;}
+.period-banner b{color:#0A0A0A;font-weight:800;}
 .leaderboard{margin-bottom:20px;padding:20px 22px;}
 .lb-table{width:100%;border-collapse:collapse;margin-top:6px;}
 .lb-table th{background:transparent;padding:10px 12px;font-size:10px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.12em;border-bottom:1px solid #E5E7EB;text-align:center;}
@@ -753,21 +914,22 @@ tbody tr:hover{background:#F9FAFB;}
   <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/admin/locations" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
 </div></div>
 <div class="wrap">
+  ${rangeSelectorHtml(period.range, "/admin")}
+  <div class="period-banner">Showing: <b>${period.label}</b>${showDeltas ? ` &nbsp;·&nbsp; <span style="color:#9CA3AF;">comparing ${period.prevLabel}</span>` : ""}</div>
+
   <div class="kpi-grid">
-    <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordings.length}</div></div>
-    <div class="card kpi"><div class="kpi-label">Scorecards</div><div class="kpi-num">${scored.length}</div><div class="kpi-foot">${historicalScorecardCount} total in history</div></div>
-    <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div></div>
+    <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordingsInPeriod.length}</div>${showDeltas ? deltaHtml(recordingsInPeriod.length, recordingsPrev.length) : ""}</div>
+    <div class="card kpi"><div class="kpi-label">Scorecards</div><div class="kpi-num">${scored.length}</div>${showDeltas ? deltaHtml(scored.length, scoredPrev.length) : `<div class="kpi-foot">${historicalScorecardCount} total in history</div>`}</div>
+    <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div>${showDeltas ? deltaHtml(totalCloses, prevTotalCloses) : ""}</div>
     <div class="card kpi">
       <div class="kpi-label">Close Rate</div>
       <div class="kpi-num" style="color:${closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626"};">${closeRate}<span style="font-size:18px;color:#9CA3AF;font-weight:600;">%</span></div>
-      ${sparklineSvg(sparkClose, closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626")}
-      <div class="kpi-foot">last 30 days</div>
+      ${showDeltas ? deltaHtml(closeRate, prevCloseRate, "%") : sparklineSvg(sparkClose, closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626") + '<div class="kpi-foot">last 30 days</div>'}
     </div>
     <div class="card kpi">
       <div class="kpi-label">Avg Score</div>
       <div class="kpi-num" style="color:${avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626"};">${avgTotal}<span style="font-size:18px;color:#9CA3AF;font-weight:600;"> / 100</span></div>
-      ${sparklineSvg(sparkScore, avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626")}
-      <div class="kpi-foot">last 30 days</div>
+      ${showDeltas ? deltaHtml(avgTotal, prevAvgTotal) : sparklineSvg(sparkScore, avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626") + '<div class="kpi-foot">last 30 days</div>'}
     </div>
     <div class="card kpi tablets-card"><div class="kpi-label">Tablets Online</div><div class="kpi-num" style="color:${connectedTablets.length > 0 ? "#00AEEF" : "#9CA3AF"};">${connectedTablets.length}</div>${connectedTablets.length ? `<div class="tablets-list">${connectedTablets.join(", ")}</div>` : ""}</div>
   </div>
@@ -816,7 +978,7 @@ tbody tr:hover{background:#F9FAFB;}
                 day: "numeric",
               })
             : "—";
-          const href = `/admin/location/${encodeURIComponent(l.location_id)}`;
+          const href = `/admin/location/${encodeURIComponent(l.location_id)}?range=${period.range}`;
           return `<tr style="cursor:pointer;" onclick="window.location='${href}'" title="View ${l.franchise_name} dashboard">
           <td style="text-align:left;">
             <div style="font-size:13px;font-weight:700;color:#0284C7;">${l.franchise_name} <span style="color:#9CA3AF;font-weight:600;">→</span></div>
@@ -1167,10 +1329,10 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
     const allScorecards = await db.getAllScorecards();
 
     // Filter to this location (canonicalize each recording to merge historical aliases).
-    const recordings = allRecordings.filter(
+    const recordingsAll = allRecordings.filter(
       (r) => canonicalLocationId(r.location_id) === slug,
     );
-    const recordingIds = new Set(recordings.map((r) => r.recording_id));
+    const recordingIds = new Set(recordingsAll.map((r) => r.recording_id));
     const scorecards = allScorecards.filter((sc) =>
       recordingIds.has(sc.recording_id),
     );
@@ -1182,8 +1344,28 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
       if (!prev || new Date(sc.created_at) > new Date(prev.created_at))
         latestByRec.set(sc.recording_id, sc);
     }
-    const scored = Array.from(latestByRec.values());
+    const allScored = Array.from(latestByRec.values());
     const historicalScorecardCount = scorecards.length;
+
+    // Date-range filter
+    const period = parseRange(req);
+    const recDateById = new Map(
+      recordingsAll.map((r) => [r.recording_id, r.recorded_at]),
+    );
+    const recordings = recordingsAll.filter((r) =>
+      period.inRange(r.recorded_at),
+    );
+    const recordingsPrev = recordingsAll.filter((r) =>
+      period.inPrev(r.recorded_at),
+    );
+    const scored = allScored.filter((sc) => {
+      const d = recDateById.get(sc.recording_id);
+      return d ? period.inRange(d) : true;
+    });
+    const scoredPrev = allScored.filter((sc) => {
+      const d = recDateById.get(sc.recording_id);
+      return d ? period.inPrev(d) : false;
+    });
 
     const totalCloses = scored.filter((s) => s.did_close === true).length;
     const closeRate = scored.length
@@ -1194,6 +1376,20 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
           scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length,
         )
       : 0;
+    const prevTotalCloses = scoredPrev.filter(
+      (s) => s.did_close === true,
+    ).length;
+    const prevCloseRate = scoredPrev.length
+      ? Math.round((prevTotalCloses / scoredPrev.length) * 100)
+      : null;
+    const prevAvgTotal = scoredPrev.length
+      ? Math.round(
+          scoredPrev.reduce((a, s) => a + (s.total_score || 0), 0) /
+            scoredPrev.length,
+        )
+      : null;
+    const showDeltas = period.range !== "all" && period.prevLabel;
+
     const avgCat = (key) =>
       scored.length
         ? Math.round(
@@ -1458,6 +1654,16 @@ a{color:#0284C7;}
 .kpi-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
 .kpi-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
 .kpi-foot{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.1em;margin-top:6px;}
+.kpi-delta{font-size:11px;font-weight:800;letter-spacing:.04em;margin-top:8px;display:inline-block;padding:2px 8px;border-radius:9999px;}
+.kpi-delta.good{background:#ECFDF5;color:#15803d;}
+.kpi-delta.bad{background:#FEF3F2;color:#DC2626;}
+.kpi-delta.neutral{background:#F3F4F6;color:#6B7280;}
+.range-bar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 14px;}
+.range-pill{display:inline-block;padding:7px 14px;background:#fff;border:1px solid #E5E7EB;color:#374151;border-radius:9999px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.02em;transition:all .15s;}
+.range-pill:hover{border-color:#0284C7;color:#0284C7;}
+.range-pill.active{background:#0A0A0A;color:#fff;border-color:#0A0A0A;}
+.period-banner{font-size:12px;color:#6B7280;margin-bottom:18px;padding:0 4px;}
+.period-banner b{color:#0A0A0A;font-weight:800;}
 .insights{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:24px;}
 @media(max-width:880px){.insights{grid-template-columns:1fr;}}
 .panel{padding:20px 22px;}
@@ -1502,21 +1708,22 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="wrap">
   <a href="/admin" class="back">← Back to all locations</a>
 
+  ${rangeSelectorHtml(period.range, `/admin/location/${encodeURIComponent(slug)}`)}
+  <div class="period-banner">Showing: <b>${period.label}</b>${showDeltas ? ` &nbsp;·&nbsp; <span style="color:#9CA3AF;">comparing ${period.prevLabel}</span>` : ""}</div>
+
   <div class="kpi-grid">
-    <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordings.length}</div></div>
-    <div class="card kpi"><div class="kpi-label">Scored</div><div class="kpi-num">${scored.length}</div></div>
-    <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div></div>
+    <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordings.length}</div>${showDeltas ? deltaHtml(recordings.length, recordingsPrev.length) : ""}</div>
+    <div class="card kpi"><div class="kpi-label">Scored</div><div class="kpi-num">${scored.length}</div>${showDeltas ? deltaHtml(scored.length, scoredPrev.length) : ""}</div>
+    <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div>${showDeltas ? deltaHtml(totalCloses, prevTotalCloses) : ""}</div>
     <div class="card kpi">
       <div class="kpi-label">Close Rate</div>
       <div class="kpi-num" style="color:${closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626"};">${closeRate}<span style="font-size:18px;color:#9CA3AF;font-weight:600;">%</span></div>
-      ${sparklineSvg(sparkClose, closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626")}
-      <div class="kpi-foot">last 30 days</div>
+      ${showDeltas ? deltaHtml(closeRate, prevCloseRate, "%") : sparklineSvg(sparkClose, closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626") + '<div class="kpi-foot">last 30 days</div>'}
     </div>
     <div class="card kpi">
       <div class="kpi-label">Avg Score</div>
       <div class="kpi-num" style="color:${avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626"};">${avgTotal}<span style="font-size:18px;color:#9CA3AF;font-weight:600;"> / 100</span></div>
-      ${sparklineSvg(sparkScore, avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626")}
-      <div class="kpi-foot">last 30 days</div>
+      ${showDeltas ? deltaHtml(avgTotal, prevAvgTotal) : sparklineSvg(sparkScore, avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626") + '<div class="kpi-foot">last 30 days</div>'}
     </div>
   </div>
 
