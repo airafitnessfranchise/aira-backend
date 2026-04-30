@@ -321,12 +321,11 @@ app.post("/admin/rescore/:id", async (req, res) => {
   res.json({ ok: true, id, started_at, test_only: !!testOnly });
 });
 
-// HTTP Basic Auth middleware for the admin browser pages. Set ADMIN_PASSWORD in
-// Railway env to lock these down. Until set, fails open so Mike doesn't lose access
-// during rollout. Username is "admin"; password is whatever ADMIN_PASSWORD is.
+// HTTP Basic Auth middleware for the admin browser pages.
+// Default password "airafitness" — override by setting ADMIN_PASSWORD in Railway env.
+// Username is always "admin".
 function adminAuth(req, res, next) {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) return next();
+  const password = process.env.ADMIN_PASSWORD || "airafitness";
   const auth = req.headers.authorization || "";
   const [scheme, encoded] = auth.split(" ");
   if (scheme === "Basic" && encoded) {
