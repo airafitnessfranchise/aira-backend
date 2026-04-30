@@ -1385,9 +1385,16 @@ $('end-btn').onclick = async () => {
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
   $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div class="spinner-row"><div class="spinner"></div><div style="color:#6B7280;font-size:13px;">This takes 20-40 seconds. Don\\'t refresh — your score is on the way.</div></div>';
-  const r = await postJson('/practice/end', { session_id: SESSION_ID });
-  if (!r.ok) { $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>'; return; }
-  renderScorecard(r.scorecard);
+  try {
+    const r = await postJson('/practice/end', { session_id: SESSION_ID });
+    if (!r.ok) {
+      $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>';
+      return;
+    }
+    renderScorecard(r.scorecard);
+  } catch (err) {
+    $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Connection Error</div><div class="score-title">Couldn\\'t reach the scorer.</div><div style="color:#6B7280;font-size:13px;margin-top:10px;">' + (err.message || err) + '</div><div class="btn-row"><button class="cta" onclick="$(\\'end-btn\\').click()">Try Again</button> <button class="cta secondary" onclick="location.reload()">Start Over</button></div>';
+  }
 };
 
 function colorFor(score, max) {
