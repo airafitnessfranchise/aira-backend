@@ -63,6 +63,7 @@ async function initDb() {
       location_id     TEXT,
       difficulty      TEXT,
       persona_label   TEXT,
+      scenario_id     TEXT,
       messages        JSONB,
       total_score     INTEGER DEFAULT 0,
       sitdown_score   INTEGER DEFAULT 0,
@@ -92,6 +93,10 @@ async function initDb() {
       created_at      TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // Add scenario_id to existing tables that pre-date the column.
+  await pool.query(
+    `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS scenario_id TEXT`,
+  );
   console.log("[DB] Tables ready");
 }
 
@@ -273,13 +278,14 @@ async function savePracticeSession({
   location_id,
   difficulty,
   persona_label,
+  scenario_id,
   messages,
   scorecard,
 }) {
   const sc = scorecard || {};
   await pool.query(
     `INSERT INTO practice_sessions (
-      session_id, location_id, difficulty, persona_label, messages,
+      session_id, location_id, difficulty, persona_label, scenario_id, messages,
       total_score, sitdown_score, objection_score, language_score, close_score, did_close,
       ai_summary, overall_coaching,
       sitdown_score_explainer, objection_score_explainer, language_score_explainer, close_score_explainer,
@@ -289,15 +295,15 @@ async function savePracticeSession({
       close_what_said, close_what_to_say, close_coaching,
       process_warning
     ) VALUES (
-      $1,$2,$3,$4,$5,
-      $6,$7,$8,$9,$10,$11,
-      $12,$13,
-      $14,$15,$16,$17,
-      $18,$19,$20,
-      $21,$22,$23,
-      $24,$25,$26,
-      $27,$28,$29,
-      $30
+      $1,$2,$3,$4,$5,$6,
+      $7,$8,$9,$10,$11,$12,
+      $13,$14,
+      $15,$16,$17,$18,
+      $19,$20,$21,
+      $22,$23,$24,
+      $25,$26,$27,
+      $28,$29,$30,
+      $31
     )
     ON CONFLICT (session_id) DO NOTHING`,
     [
@@ -305,6 +311,7 @@ async function savePracticeSession({
       location_id,
       difficulty,
       persona_label,
+      scenario_id || null,
       JSON.stringify(messages),
       sc.total_score || 0,
       sc.sitdown_score || 0,

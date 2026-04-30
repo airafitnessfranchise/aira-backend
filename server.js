@@ -1157,7 +1157,16 @@ app.post("/practice/start", async (req, res) => {
     const location_id = req.body.location_id
       ? canonicalLocationId(req.body.location_id)
       : null;
-    const out = startPracticeSession({ difficulty, location_id });
+    // Recently-seen scenario IDs come from a cookie on this browser. Pass them in so
+    // the picker biases away from repeats. The cookie is updated client-side after each session.
+    const cookieRaw = req.headers.cookie || "";
+    const m = cookieRaw.match(/aira_seen=([^;]+)/);
+    const recently_seen = m ? decodeURIComponent(m[1]) : "";
+    const out = startPracticeSession({
+      difficulty,
+      location_id,
+      recently_seen,
+    });
     res.json({ ok: true, ...out });
   } catch (err) {
     console.error("[Practice] start error:", err.message);
@@ -1203,12 +1212,14 @@ app.post("/practice/end", async (req, res) => {
       location_id: session.location_id || "unknown",
       franchise_name: session.location_id || "Aira Fitness",
     };
+    const personaLabelForRecord = `${session.bucket_label} — ${session.scenario.name}`;
     try {
       await db.savePracticeSession({
         session_id,
         location_id: session.location_id || null,
         difficulty: session.difficulty,
-        persona_label: session.persona.label,
+        persona_label: personaLabelForRecord,
+        scenario_id: session.scenario.id,
         messages: result.messages,
         scorecard: result.scorecard,
       });
@@ -1221,6 +1232,7 @@ app.post("/practice/end", async (req, res) => {
       ok: true,
       scorecard: result.scorecard,
       messages: result.messages,
+      scenario_id: session.scenario.id,
     });
 
     // Fire-and-forget email — don't block the response.
@@ -1228,7 +1240,7 @@ app.post("/practice/end", async (req, res) => {
       session_id,
       location,
       difficulty: session.difficulty,
-      persona_label: session.persona.label,
+      persona_label: personaLabelForRecord,
       messages: result.messages,
       scorecard: result.scorecard,
     }).catch((emailErr) => {
@@ -1377,6 +1389,16 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
 <script>
 const $ = (id) => document.getElementById(id);
 let SESSION_ID = null;
+let SCENARIO_ID = '';
+
+// Track recently-seen scenario IDs so the next session picks something different.
+function rememberScenario(id) {
+  if (!id) return;
+  const existing = (document.cookie.match(/aira_seen=([^;]+)/) || [])[1] || '';
+  const seen = decodeURIComponent(existing).split(',').filter(Boolean);
+  const updated = [id, ...seen.filter(s => s !== id)].slice(0, 6);
+  document.cookie = 'aira_seen=' + encodeURIComponent(updated.join(',')) + '; path=/; max-age=2592000; SameSite=Lax';
+}
 
 function bubble(role, text) {
   const div = document.createElement('div');
@@ -1401,7 +1423,8 @@ $('start-btn').onclick = async () => {
   const r = await postJson('/practice/start', { difficulty, location_id });
   if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
   SESSION_ID = r.session_id;
-  $('persona-label').textContent = r.persona_label + ' Prospect';
+  SCENARIO_ID = r.scenario_id || '';
+  $('persona-label').textContent = r.persona_label + (r.persona_name ? ' — ' + r.persona_name : '');
   $('start').classList.add('hidden');
   $('chat').classList.remove('hidden');
   bubble('prospect', r.opening);
@@ -1445,6 +1468,7 @@ $('end-btn').onclick = async () => {
       $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>';
       return;
     }
+    rememberScenario(r.scenario_id || SCENARIO_ID);
     renderScorecard(r.scorecard, r.messages);
   } catch (err) {
     $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Connection Error</div><div class="score-title">Couldn\\'t reach the scorer.</div><div style="color:#6B7280;font-size:13px;margin-top:10px;">' + (err.message || err) + '</div><div class="btn-row"><button class="cta" onclick="$(\\'end-btn\\').click()">Try Again</button> <button class="cta secondary" onclick="location.reload()">Start Over</button></div>';
