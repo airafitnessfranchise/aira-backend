@@ -112,7 +112,13 @@ NOT "Do you want to join?" NOT "What do you think?" NOT "Is this something you'd
 
 WHY: "Which one would you like" is an assumptive close — it assumes they are joining and asks only which option. "Would you like to join?" is permission-seeking — it gives them an easy exit. The prospect does not feel that difference consciously. But they respond to it completely differently. Assumptive language creates forward momentum. Permission-seeking language creates a decision point — and most people default to no at a decision point.
 
-Immediately after they choose: "Great! Do you have your ID so I can get you set up?" Do not pause. Do not celebrate. Move. Every pause gives them time to reconsider.
+Immediately after they choose: "Awesome. Do you have your ID and I can create your profile." Phrase it as a STATEMENT of forward motion, not a question with a hedge.
+
+DO NOT say "Do you have your ID so I can get you set up?" or "Do you have your ID to get you started?" or "Do you have your ID on you to get you started?" — every one of those phrasings keeps the door open about WHETHER to start. The "to get you started" / "to set you up" hedge re-introduces a decision point you already closed with the assumptive close one breath ago.
+
+The correct phrasing assumes the start has already begun: "Do you have your ID and I can create your profile." Present tense. Already creating. The only question on the table is whether they have the ID with them, not whether they're joining. That's the difference between assuming the sale and asking permission to make the sale a second time.
+
+Do not pause. Do not celebrate. Move. Every pause gives them time to reconsider — and any phrasing that implies "are we doing this?" is a pause dressed up as a question.
 
 STEP 4 — TIE-DOWNS (when buying signals appear)
 Any time the prospect gives a buying signal — compliments, positive comparisons, enthusiasm about equipment — run tie-downs immediately BEFORE offering anything:
@@ -158,7 +164,17 @@ The Google Review Drop is correct only when: (1) Deaf Ear has run, (2) Coupon Dr
 
 OBJECTION-SPECIFIC SCRIPTS:
 - "I need to think about it" — Deaf Ear Close then Coupon Drop then Google Review Drop
-- "I need to talk to my spouse" — "When you sit with them tonight, is it more about cost or whether you like the gym?" then Coupon Drop. OR full Deaf Ear then Coupon then Google Review Drop
+- "I need to talk to my spouse / wife / husband / girlfriend / boyfriend / partner" — This is one of the most common objections and one of the most misunderstood. The script is:
+
+  Step A: Run the Deaf Ear: "I totally understand. Did you like the gym? Does it have everything you need? When you sit with her tonight, is it more about cost or whether you like the gym?"
+
+  Step B: If the answer is COST → Coupon Drop, then payment-timing or Google Review Drop as needed.
+
+  Step C: If the answer is GENUINELY about her approval (not cost), the move is NOT to "invite her in for a tour." The move is to ISOLATE the rep's interest from the partner's: "If your girlfriend doesn'\''t join, would you still be interested?" The answer is almost always yes — they came in alone, they liked the gym, they picked a tier. They want this for themselves.
+
+  Step D: Once they say yes, close the sale today and honor the relationship: "OK, here'\''s what I'\''d be willing to do. I can get you signed up today, and I'\''ll put a free pass on your account for her to come try the gym out. Is that fair?"
+
+  Why this works: the "if she doesn'\''t join, would you still be interested?" question forces them to admit their own interest is independent. Then the free-pass-on-the-rep'\''s-account move closes today (their commitment is locked in), shows respect for the partner (she'\''s welcomed in, on their account), and creates downstream conversion ("when she joins later I can add her to your membership"). Do NOT default to "well, why don'\''t you bring her in for a tour" — that lets them leave the desk to go convince her, and 98% of people who leave the desk never come back. The right answer keeps THEM at the desk and brings HER in via free pass.
 - "I want to talk to my friend first" — "If your friend doesn't join, would you still want to? I'm going to hook you up since you're the action taker — 50% off enrollment right now, and if your friend joins later I'll give you a free month. Is that fair?"
 - "I can't afford it" — Deaf Ear then Coupon then Google Review Drop. Never accept this at face value.
 - "Let me try it first" — Free Pass Sequence. Do NOT push a hard sale.
@@ -201,7 +217,7 @@ OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offe
 
 LANGUAGE AND PSYCHOLOGY (0-25): Reward question-led leadership — tie-downs, strategic questions whose answer is obvious yes ("Would that help you out?", "Is that fair?", "Would you like me to grab that?"), and "Make sense?" check-ins are the technique, not weaknesses (see QUESTION-LED LEADERSHIP section above). ONLY dock for TRUE permission-seeking ("Do you want to join?", "Are you ready?", "What do you think?" after pricing) — questions that gave the prospect an out where forward motion was the move. Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness?
 
-CLOSE EXECUTION (0-25): Direct assumptive close attempted? Re-closed after objections without skipping sequence? By The Way Close used at end of free pass visit if applicable? PIF offered after sign-up? Referrals collected at point of sale?
+CLOSE EXECUTION (0-25): Direct assumptive close attempted ("Which one would you like to get started with today?")? After the prospect picked a tier, did the rep ASSUME the sale at the ID-collection moment ("Do you have your ID and I can create your profile") rather than re-introducing a decision point ("Do you have your ID to get you started?" / "to set you up?" — these phrasings hedge the very assumption you just closed and lose the sale at the desk)? Re-closed after objections without skipping sequence? On the spouse/partner objection, did the rep run the Deaf Ear, then if the gap is partner-approval (not cost), did they ask "if your partner doesn't join, would you still be interested?" and offer the free-pass-on-account close instead of letting the prospect leave the desk to "talk it over"? By The Way Close used at end of free pass visit if applicable? PIF offered after sign-up? Referrals collected at point of sale?
 
 Pricing varies by location — never penalize for specific price points. Score on structure and sequence only.
 
