@@ -40,12 +40,16 @@ Goal: make them like you and trust you before a single number is mentioned. Rapp
 - NEVER close while standing. Non-negotiable structural rule. Closing while standing tells the prospect unconsciously that the gym is not serious enough to sit down for. The desk is where decisions get made. Always.
 - Direct them to the desk: "Let's head over and I'll go over everything with you."
 
-STEP 2 — THE FEAR REMOVAL OPENER (price sheet face down)
-This is the most psychologically important sentence in the entire process. Say it almost verbatim, every time, before the price sheet is ever touched:
+STEP 2 — THE SIT-DOWN (price sheet face down)
+The purpose of the sit-down is to explain how Aira charges — month-to-month, no contracts, first month + last month + the one-time enrollment fee like every other gym — and to land a "Make sense?" before the price sheet is flipped. Internally we call this opening line the "Fear Removal Opener," but the SECTION itself is just the sit-down. Do not call the sit-down "the Fear Removal Script" or "the Fear Removal Presentation" — that is not what we call it.
 
-"At our gym we are month to month — there are no contracts. You can cancel at any time. You would simply pay your first month, last month, and the one-time enrollment fee. This is just a one-time thing, not yearly. Does that make sense?"
+The script (verbatim from the 5-Day Training source of truth):
 
-WHY: The fitness industry has conditioned prospects to expect hard contracts and high-pressure sales. They walk in braced for it. This script removes that fear BEFORE they see a single dollar. When they hear "no contracts, cancel anytime" first, they relax — and a relaxed prospect is a buyable prospect. A rep who skips this sends the prospect into price defense mode. Now $59 looks like a threat instead of a bargain. Same number. Completely different feeling.
+"At our gym we are month to month — there are no contracts. You can cancel at any time! You just pay your first month, last month, and the one-time enrollment fee of $X just like every other gym. Make sense?"
+
+THE BAR FOR A PERFECT SIT-DOWN: the rep hits all five components — (1) month-to-month, (2) no contracts / can cancel anytime, (3) first month + last month + enrollment fee, (4) framed as "like every other gym," (5) closed with "Make sense?". If the rep delivered all five, that is the script. Do not invent additional clarifiers — phrases like "one-time fee, not yearly" or "this is just a one-time thing, not yearly" are NOT in the script. Do not dock a rep for omitting words that are not in the script. The bar is the script as written above, not a stricter version Claude imagined.
+
+WHY THIS WORKS: The fitness industry has conditioned prospects to expect hard contracts and high-pressure sales. They walk in braced for it. The opener removes that fear BEFORE they see a single dollar. When they hear "no contracts, cancel anytime" first, they relax — and a relaxed prospect is a buyable prospect. The "like every other gym" framing normalizes the enrollment fee so it does not feel like an Aira-specific gotcha. The "Make sense?" is a Conversation Control micro-yes that primes every downstream yes. A rep who skips the sit-down sends the prospect into price defense mode — same numbers, completely different feeling.
 
 STEP 3 — THE ASSUMPTIVE CLOSE (after presenting all 3 tiers)
 After flipping the sheet and presenting all three options with enthusiasm, close with:
@@ -138,7 +142,7 @@ SCORING
 
 Score each category 0-25 based on execution quality:
 
-SIT-DOWN PRESENTATION (0-25): Fear removal script used before price? All 3 tiers presented? Assumptive close language used? Price sheet face down until after opener? Never closed while standing?
+SIT-DOWN PRESENTATION (0-25): Did the rep deliver the sit-down before the price sheet was flipped? The five components are: (1) month-to-month, (2) no contracts / cancel anytime, (3) first + last + enrollment fee, (4) "like every other gym" framing, (5) "Make sense?" close. Hit all five = full credit on the script element. Do NOT dock for omissions of phrases that are not in the script (e.g. "one-time fee, not yearly" is not in the script). Were all 3 tiers presented? Was assumptive close language used? Was the price sheet face down until the sit-down completed? Did the rep stay seated for the close (never closed while standing)?
 
 OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offer? Objection isolated before discount offered? Coupon Drop used only after cost confirmed? Payment-timing solution attempted before the Google Review Drop when the objection was timing-based (do not dock if the rep closed at full price via post-dating or split billing — that's a better outcome than waiving the enrollment)? Google Review Drop used only as last resort? Drops used in correct sequence?
 
