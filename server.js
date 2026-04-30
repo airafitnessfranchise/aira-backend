@@ -316,6 +316,50 @@ app.get("/admin", async (req, res) => {
     scorecards.forEach((s) => { scorecardMap[s.recording_id] = s; });
     const connectedTablets = Array.from(tabletConnections.keys());
 
+    // ─── Analytics: KPIs + per-category averages + recurring coaching themes ───
+    const scored = scorecards;  // every row in scorecards is already scored
+    const totalCloses = scored.filter((s) => s.did_close === true).length;
+    const closeRate = scored.length ? Math.round((totalCloses / scored.length) * 100) : 0;
+    const avgTotal = scored.length ? Math.round(scored.reduce((a, s) => a + (s.total_score || 0), 0) / scored.length) : 0;
+    const avgCat = (key) => scored.length ? Math.round(scored.reduce((a, s) => a + (s[key] || 0), 0) / scored.length * 10) / 10 : 0;
+    const catStats = [
+      { label: "Sit-Down", avg: avgCat("sitdown_score"), key: "sitdown_score" },
+      { label: "Objection Handling", avg: avgCat("objection_score"), key: "objection_score" },
+      { label: "Language & Psychology", avg: avgCat("language_score"), key: "language_score" },
+      { label: "Close Execution", avg: avgCat("close_score"), key: "close_score" },
+    ].sort((a, b) => a.avg - b.avg);  // weakest first
+    const activeLocations = new Set(recordings.map((r) => r.location_id)).size;
+
+    // Recurring coaching themes — keyword scan across overall_coaching + per-section coaching + explainers.
+    // Each theme: a display name and an array of regex/phrase patterns. A scorecard counts ONCE per theme
+    // even if multiple patterns match (so the count = # of consults exhibiting the issue).
+    const themes = [
+      { name: "Skipped 'Make sense?' close on sit-down", patterns: [/make sense\??\s*(close|check|micro)/i, /skipped (the )?['"]?make sense/i, /missed (the )?['"]?make sense/i, /didn'?t (say|use|land) ['"]?make sense/i] },
+      { name: "Offered discount before isolating cost (skipped Deaf Ear)", patterns: [/(coupon|discount).{0,40}(too early|before.{0,30}(deaf ear|isolat))/i, /skipped (the )?deaf ear/i, /didn'?t run (the )?deaf ear/i, /led with (the )?(coupon|discount)/i, /jump(ed|ing) to (the )?coupon/i] },
+      { name: "Permission-seeking instead of assumptive close", patterns: [/permission.?seeking/i, /['"]?(would|do) you (like to|want to)['"]?.{0,50}(instead|rather than|permission)/i, /not assumptive/i] },
+      { name: "Accepted 'let me think about it' without re-closing", patterns: [/accept(ed|ing) ['"]?(let me think|I'?ll come back|I need to think)/i, /didn'?t re-?close/i, /let (her|him|them) walk/i, /didn'?t push back/i] },
+      { name: "Didn't run tie-downs after buying signals", patterns: [/skipped (the )?tie.?down/i, /missed (the )?tie.?down/i, /didn'?t run (the )?tie.?down/i, /no tie.?down/i, /buying signal.{0,40}(missed|skipped|ignored)/i] },
+      { name: "Didn't offer PIF after close", patterns: [/didn'?t (offer|run) (the )?pif/i, /skipped (the )?pif/i, /missed (the )?pif/i, /no pif (close|offer)/i] },
+      { name: "Didn't collect referrals", patterns: [/didn'?t (collect|ask for|run) referrals?/i, /skipped (the )?referral/i, /missed (the )?referral/i, /no referral collect/i] },
+      { name: "Closed (or attempted to) while standing", patterns: [/clos(ed|ing) (while )?standing/i, /didn'?t sit down/i, /never sat down/i, /standing close/i] },
+      { name: "Used Google Review Drop too early", patterns: [/google review.{0,30}(too early|before.{0,30}(coupon|deaf ear))/i, /jump(ed|ing) to (the )?google review/i, /led with (the )?google review/i] },
+      { name: "Didn't present all 3 tiers", patterns: [/didn'?t (present|show) all (3|three) tiers/i, /skipped (a )?tier/i, /only (presented|showed) (one|two)/i, /missed (a )?tier/i] },
+      { name: "Skipped 'By The Way' close on free pass", patterns: [/skipped (the )?by the way/i, /missed (the )?by the way/i, /didn'?t use (the )?by the way/i, /no by the way close/i] },
+    ];
+    const themeCounts = themes.map((t) => {
+      let count = 0;
+      for (const sc of scored) {
+        const hay = [
+          sc.overall_coaching, sc.coaching_note, sc.process_warning,
+          sc.sitdown_score_explainer, sc.objection_score_explainer, sc.language_score_explainer, sc.close_score_explainer,
+          sc.sitdown_coaching, sc.objection_coaching, sc.language_coaching, sc.close_coaching,
+        ].filter(Boolean).join(" ");
+        if (t.patterns.some((p) => p.test(hay))) count++;
+      }
+      const pct = scored.length ? Math.round((count / scored.length) * 100) : 0;
+      return { name: t.name, count, pct };
+    }).filter((t) => t.count > 0).sort((a, b) => b.count - a.count).slice(0, 8);
+
     const fmtDate = (d) => new Date(d).toLocaleString("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     const fmtDuration = (sec) => Math.round(sec / 60) + "m " + (sec % 60) + "s";
 
@@ -363,12 +407,36 @@ a{color:#0284C7;}
 .eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
 .title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
 .subtitle{font-size:13px;color:#6B7280;margin-top:2px;}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:24px 0 20px;}
-.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:18px 20px;}
-.card-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
-.card-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-top:6px;}
-.tablets-card .card-num{color:${connectedTablets.length > 0 ? "#00AEEF" : "#9CA3AF"};}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:24px 0 20px;}
+.kpi{padding:16px 18px;}
+.kpi-label{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
+.kpi-num{font-size:30px;font-weight:900;color:#00AEEF;line-height:1.1;letter-spacing:-.02em;}
 .tablets-list{font-size:11px;color:#6B7280;margin-top:6px;}
+.insights{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:24px;}
+@media(max-width:880px){.insights{grid-template-columns:1fr;}}
+.panel{padding:20px 22px;}
+.panel-header{margin-bottom:14px;}
+.panel-eyebrow{font-size:10px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;}
+.panel-sub{font-size:12px;color:#6B7280;margin-top:4px;}
+.panel-empty{font-size:13px;color:#9CA3AF;padding:18px 0;text-align:center;}
+.cat-row{margin-top:14px;}
+.cat-row:first-of-type{margin-top:6px;}
+.cat-row-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.cat-label{font-size:13px;font-weight:700;color:#111827;}
+.cat-score{font-size:14px;font-weight:800;}
+.cat-bar{background:#F3F4F6;border-radius:9999px;height:6px;overflow:hidden;}
+.cat-bar-fill{height:6px;border-radius:9999px;}
+.theme-row{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F3F4F6;}
+.theme-row:last-child{border-bottom:none;}
+.theme-rank{font-size:18px;font-weight:900;width:22px;flex-shrink:0;text-align:center;}
+.theme-body{flex:1;min-width:0;}
+.theme-name{font-size:13px;font-weight:700;color:#111827;margin-bottom:5px;line-height:1.3;}
+.theme-bar{background:#F3F4F6;border-radius:9999px;height:4px;overflow:hidden;}
+.theme-bar-fill{height:4px;border-radius:9999px;}
+.theme-count{font-size:16px;font-weight:900;flex-shrink:0;text-align:right;min-width:60px;}
+.section-eyebrow{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;margin:8px 0 10px 4px;}
+
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;}
 .table-wrap{background:#fff;border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;}
 table{width:100%;border-collapse:collapse;}
 thead th{background:#F9FAFB;padding:12px 16px;text-align:left;font-size:10px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.12em;border-bottom:1px solid #E5E7EB;}
@@ -384,11 +452,54 @@ tbody tr:hover{background:#F9FAFB;}
   <div class="subtitle">Live view of all consultation recordings and scoring</div>
 </div></div>
 <div class="wrap">
-  <div class="cards">
-    <div class="card"><div class="card-num">${recordings.length}</div><div class="card-label">Recordings</div></div>
-    <div class="card"><div class="card-num">${scorecards.length}</div><div class="card-label">Scorecards</div></div>
-    <div class="card tablets-card"><div class="card-num">${connectedTablets.length}</div><div class="card-label">Tablets Online</div>${connectedTablets.length ? `<div class="tablets-list">${connectedTablets.join(", ")}</div>` : ""}</div>
+  <div class="kpi-grid">
+    <div class="card kpi"><div class="kpi-label">Recordings</div><div class="kpi-num">${recordings.length}</div></div>
+    <div class="card kpi"><div class="kpi-label">Scorecards</div><div class="kpi-num">${scorecards.length}</div></div>
+    <div class="card kpi"><div class="kpi-label">Total Closes</div><div class="kpi-num">${totalCloses}</div></div>
+    <div class="card kpi"><div class="kpi-label">Close Rate</div><div class="kpi-num" style="color:${closeRate >= 30 ? "#00AEEF" : closeRate >= 15 ? "#0284C7" : "#DC2626"};">${closeRate}<span style="font-size:18px;color:#9CA3AF;font-weight:600;">%</span></div></div>
+    <div class="card kpi"><div class="kpi-label">Avg Score</div><div class="kpi-num" style="color:${avgTotal >= 70 ? "#00AEEF" : avgTotal >= 50 ? "#0284C7" : "#DC2626"};">${avgTotal}<span style="font-size:18px;color:#9CA3AF;font-weight:600;"> / 100</span></div></div>
+    <div class="card kpi tablets-card"><div class="kpi-label">Tablets Online</div><div class="kpi-num" style="color:${connectedTablets.length > 0 ? "#00AEEF" : "#9CA3AF"};">${connectedTablets.length}</div>${connectedTablets.length ? `<div class="tablets-list">${connectedTablets.join(", ")}</div>` : ""}</div>
   </div>
+
+  <div class="insights">
+    <div class="card panel">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Average Score by Category</div>
+        <div class="panel-sub">${scored.length} scored consult${scored.length === 1 ? "" : "s"} — weakest categories first</div>
+      </div>
+      ${scored.length === 0 ? '<div class="panel-empty">No scored consults yet.</div>' : catStats.map((c) => {
+        const pct = (c.avg / 25) * 100;
+        const color = pct >= 80 ? "#00AEEF" : pct >= 60 ? "#0284C7" : "#DC2626";
+        return `<div class="cat-row">
+          <div class="cat-row-head">
+            <div class="cat-label">${c.label}</div>
+            <div class="cat-score" style="color:${color};">${c.avg}<span style="color:#9CA3AF;font-weight:600;"> / 25</span></div>
+          </div>
+          <div class="cat-bar"><div class="cat-bar-fill" style="background:${color};width:${pct}%;"></div></div>
+        </div>`;
+      }).join("")}
+    </div>
+
+    <div class="card panel">
+      <div class="panel-header">
+        <div class="panel-eyebrow">Top Coaching Themes</div>
+        <div class="panel-sub">Recurring mistakes detected across coaching notes — train these first</div>
+      </div>
+      ${themeCounts.length === 0 ? '<div class="panel-empty">No recurring themes detected yet.</div>' : themeCounts.map((t, i) => {
+        const sev = t.pct >= 50 ? "#DC2626" : t.pct >= 25 ? "#0284C7" : "#00AEEF";
+        return `<div class="theme-row">
+          <div class="theme-rank" style="color:${sev};">${i + 1}</div>
+          <div class="theme-body">
+            <div class="theme-name">${t.name}</div>
+            <div class="theme-bar"><div class="theme-bar-fill" style="background:${sev};width:${t.pct}%;"></div></div>
+          </div>
+          <div class="theme-count" style="color:${sev};">${t.count}<span style="color:#9CA3AF;font-weight:600;font-size:11px;"> / ${scored.length}</span></div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>
+
+  <div class="section-eyebrow">All Recordings</div>
   <div class="table-wrap">
     <table>
       <thead><tr>
