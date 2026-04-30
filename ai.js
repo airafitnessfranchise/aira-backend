@@ -81,16 +81,29 @@ WHY: "Did you get the coupon?" makes it feel like they found something that alre
 
 CRITICAL: This only works as leverage because the prospect believed the price was real and fixed. The moment a rep leads with the coupon before running the Deaf Ear, they destroy that belief permanently. The prospect now knows the price is always negotiable.
 
-STEP 7 — THE BRAND AMBASSADOR DROP (only after coupon is declined)
+STEP 7 — THE GOOGLE REVIEW DROP (LAST resort — only after coupon is declined AND no payment-timing solution works)
 "OK — it sounds like you'd like to join, but even with 50% off, the upfront is still too much. Is that right? I would be willing to help you if you're willing to help me. In exchange for a positive review and referring friends, I'd be willing to waive the enrollment completely. Is that fair?"
 
 WHY: "I would be willing to help you if you're willing to help me" creates reciprocity — one of the most powerful forces in human psychology. This is a trade, not a giveaway. "Is that fair?" is one of the most effective closing lines in sales because almost no one says "no, that's not fair."
 
+REVENUE PRIORITY — PAYMENT-TIMING SOLUTIONS BEAT THE GOOGLE REVIEW DROP
+
+The Google Review Drop waives the enrollment fee. That is real money out of the franchisee's pocket — it is the most expensive lever in the entire process and must be used last. When a prospect's objection is timing-based ("I don't get paid till Friday," "I get paid on the 1st," "I just paid rent this week"), the correct move is a payment-timing solution that PRESERVES the full enrollment fee:
+
+- Post-date the billing to their next pay date
+- Split the enrollment across two charges
+- Charge the first month today, defer last + enrollment to payday
+- Take a partial payment now, schedule the balance
+
+A rep who finds a creative payment-timing solution and closes at FULL price has executed the highest-revenue outcome. Do NOT coach them to have used the Google Review Drop instead — that would have cost the franchisee the entire enrollment fee for the same close. Praise the payment-timing creativity; this is exactly the resourcefulness the process rewards.
+
+The Google Review Drop is correct only when: (1) Deaf Ear has run, (2) Coupon Drop has been declined, AND (3) no payment-timing solution can bridge the gap. Order of expense, lowest to highest: full price → Coupon (50% off enrollment) → payment-timing (full price, deferred) → Google Review Drop (enrollment waived). When scoring, never dock a rep for using a cheaper lever than the one in the script — only dock for using a more expensive lever than necessary, or for skipping the Deaf Ear entirely.
+
 OBJECTION-SPECIFIC SCRIPTS:
-- "I need to think about it" — Deaf Ear Close then Coupon Drop then Brand Ambassador Drop
-- "I need to talk to my spouse" — "When you sit with them tonight, is it more about cost or whether you like the gym?" then Coupon Drop. OR full Deaf Ear then Coupon then Brand Ambassador Drop
+- "I need to think about it" — Deaf Ear Close then Coupon Drop then Google Review Drop
+- "I need to talk to my spouse" — "When you sit with them tonight, is it more about cost or whether you like the gym?" then Coupon Drop. OR full Deaf Ear then Coupon then Google Review Drop
 - "I want to talk to my friend first" — "If your friend doesn't join, would you still want to? I'm going to hook you up since you're the action taker — 50% off enrollment right now, and if your friend joins later I'll give you a free month. Is that fair?"
-- "I can't afford it" — Deaf Ear then Coupon then Brand Ambassador Drop. Never accept this at face value.
+- "I can't afford it" — Deaf Ear then Coupon then Google Review Drop. Never accept this at face value.
 - "Let me try it first" — Free Pass Sequence. Do NOT push a hard sale.
 
 STEP 8 — FREE PASS SEQUENCE (when prospect asks to try first)
@@ -127,7 +140,7 @@ Score each category 0-25 based on execution quality:
 
 SIT-DOWN PRESENTATION (0-25): Fear removal script used before price? All 3 tiers presented? Assumptive close language used? Price sheet face down until after opener? Never closed while standing?
 
-OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offer? Objection isolated before discount offered? Coupon Drop used only after cost confirmed? Brand Ambassador Drop used only after coupon declined? Drops used in correct sequence?
+OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offer? Objection isolated before discount offered? Coupon Drop used only after cost confirmed? Payment-timing solution attempted before the Google Review Drop when the objection was timing-based (do not dock if the rep closed at full price via post-dating or split billing — that's a better outcome than waiving the enrollment)? Google Review Drop used only as last resort? Drops used in correct sequence?
 
 LANGUAGE AND PSYCHOLOGY (0-25): Assumptive vs permission-seeking language? Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness?
 
@@ -198,7 +211,7 @@ The structure:
 
 2. Explain WHY this specific prospect closed despite the process gaps. Look at the transcript. Was the prospect already 90% sold when they walked in? Did they bring their ID out unprompted? Were they comparing favorably to a current gym they hated? Did they self-eliminate their own objections without help? Name the specific reasons THIS prospect was easy.
 
-3. Construct a specific counterfactual using the SAME approach with a different prospect type. "If she had pushed back on price after you offered the coupon early, you would have had nothing left in the tank. The Brand Ambassador Drop only works as a final lever — you used your final lever first, and you got away with it because she wasn't going to push. Half of your prospects WILL push."
+3. Construct a specific counterfactual using the SAME approach with a different prospect type. "If she had pushed back on price after you offered the coupon early, the next move was a payment-timing solution to preserve the enrollment fee — only after that fails do you go to the Google Review Drop, because that one waives real revenue. Half of your prospects WILL push, and you need the cheaper levers ready before the most expensive one."
 
 4. Name the specific tool they gave away or skipped, and explain that closing this one without it doesn't mean they don't need it. Winning with a weak process produces false confidence. The coaching exists to prevent the next three losses, not to take away this win.
 
