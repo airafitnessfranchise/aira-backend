@@ -321,7 +321,26 @@ app.post("/admin/rescore/:id", async (req, res) => {
   res.json({ ok: true, id, started_at, test_only: !!testOnly });
 });
 
-app.get("/admin", async (req, res) => {
+// HTTP Basic Auth middleware for the admin browser pages. Set ADMIN_PASSWORD in
+// Railway env to lock these down. Until set, fails open so Mike doesn't lose access
+// during rollout. Username is "admin"; password is whatever ADMIN_PASSWORD is.
+function adminAuth(req, res, next) {
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) return next();
+  const auth = req.headers.authorization || "";
+  const [scheme, encoded] = auth.split(" ");
+  if (scheme === "Basic" && encoded) {
+    const decoded = Buffer.from(encoded, "base64").toString("utf8");
+    const idx = decoded.indexOf(":");
+    const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
+    const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
+    if (user === "admin" && pass === password) return next();
+  }
+  res.set("WWW-Authenticate", 'Basic realm="Aira Admin"');
+  return res.status(401).send("Authentication required");
+}
+
+app.get("/admin", adminAuth, async (req, res) => {
   try {
     const recordings = await db.getAllRecordings();
     const scorecards = await db.getAllScorecards();
@@ -888,7 +907,7 @@ tbody tr:hover{background:#F9FAFB;}
   }
 });
 
-app.get("/admin/library", async (req, res) => {
+app.get("/admin/library", adminAuth, async (req, res) => {
   try {
     const recordings = await db.getAllRecordings();
     const scorecards = await db.getAllScorecards();
@@ -1319,7 +1338,6 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
     <div class="title">Objection Bot</div>
     <div class="subtitle">Run a mock consult against an AI prospect. Get scored at the end.</div>
   </div>
-  <a href="/admin" class="back">← Back to Admin</a>
 </div></div>
 
 <div class="stage">
@@ -1487,13 +1505,13 @@ function renderScorecard(s, messages) {
     catRows +
     coachingHtml +
     renderConversation(messages) +
-    '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button> <a class="cta secondary" href="/admin" style="text-decoration:none;display:inline-block;">Back to Admin</a></div>';
+    '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button></div>';
 }
 </script>
 </body></html>`);
 });
 
-app.get("/scorecard/:id", async (req, res) => {
+app.get("/scorecard/:id", adminAuth, async (req, res) => {
   try {
     const r = await db.getRecording(req.params.id);
     if (!r) return res.status(404).send("Recording not found");
@@ -1623,7 +1641,7 @@ a{color:#0284C7;}
   }
 });
 
-app.get("/playback/:recording_id", async (req, res) => {
+app.get("/playback/:recording_id", adminAuth, async (req, res) => {
   const rec = await db.getRecording(req.params.recording_id);
   if (!rec || !rec.audio_file_url) return res.status(404).send("Not found");
   const name = rec.contact_name || rec.appointment_id;
