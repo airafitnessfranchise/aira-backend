@@ -1178,8 +1178,12 @@ app.post("/practice/end", async (req, res) => {
         error: "Conversation too short to score (need at least 2 exchanges)",
       });
     }
-    const scorecard = await scorePracticeSession(session_id);
-    res.json({ ok: true, scorecard });
+    const result = await scorePracticeSession(session_id);
+    res.json({
+      ok: true,
+      scorecard: result.scorecard,
+      messages: result.messages,
+    });
   } catch (err) {
     console.error("[Practice] end error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -1268,6 +1272,7 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
 .coaching p:first-child{margin-top:0;}
 .coaching-header{font-size:11px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;}
 .btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.conversation{margin-top:18px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:18px 20px;}
 .spinner-row{display:flex;align-items:center;gap:14px;margin-top:18px;}
 .spinner{width:20px;height:20px;border:2.5px solid #E5E7EB;border-top-color:#00AEEF;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
 @keyframes spin{to{transform:rotate(360deg);}}
@@ -1391,7 +1396,7 @@ $('end-btn').onclick = async () => {
       $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>';
       return;
     }
-    renderScorecard(r.scorecard);
+    renderScorecard(r.scorecard, r.messages);
   } catch (err) {
     $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Connection Error</div><div class="score-title">Couldn\\'t reach the scorer.</div><div style="color:#6B7280;font-size:13px;margin-top:10px;">' + (err.message || err) + '</div><div class="btn-row"><button class="cta" onclick="$(\\'end-btn\\').click()">Try Again</button> <button class="cta secondary" onclick="location.reload()">Start Over</button></div>';
   }
@@ -1402,7 +1407,27 @@ function colorFor(score, max) {
   return pct >= 70 ? '#00AEEF' : pct >= 50 ? '#0284C7' : '#DC2626';
 }
 
-function renderScorecard(s) {
+function escapeHtml(t) {
+  return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderConversation(messages) {
+  if (!messages || !messages.length) return '';
+  const rows = messages.map(m => {
+    const isRep = m.role === 'user';
+    const label = isRep ? 'YOU SAID' : 'PROSPECT SAID';
+    const labelColor = isRep ? '#00AEEF' : '#6B7280';
+    const bg = isRep ? '#F0FBFF' : '#F9FAFB';
+    const border = isRep ? '#BAE6FD' : '#E5E7EB';
+    return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;padding:12px 14px;margin-bottom:8px;">' +
+      '<div style="font-size:10px;font-weight:800;letter-spacing:.14em;color:' + labelColor + ';margin-bottom:4px;">' + label + '</div>' +
+      '<div style="font-size:13.5px;color:#111827;line-height:1.55;">' + escapeHtml(m.content) + '</div>' +
+    '</div>';
+  }).join('');
+  return '<div class="conversation"><div class="coaching-header" style="margin-bottom:10px;">The Conversation</div>' + rows + '</div>';
+}
+
+function renderScorecard(s, messages) {
   const total = s.total_score || 0;
   const totalColor = colorFor(total, 100);
   const closed = s.did_close === true;
@@ -1429,6 +1454,7 @@ function renderScorecard(s) {
     (s.ai_summary ? '<div class="score-summary">' + s.ai_summary + '</div>' : '') +
     catRows +
     coachingHtml +
+    renderConversation(messages) +
     '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button> <a class="cta secondary" href="/admin" style="text-decoration:none;display:inline-block;">Back to Admin</a></div>';
 }
 </script>

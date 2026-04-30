@@ -40,6 +40,33 @@ THE PRACTICAL CONSEQUENCE FOR SCORING:
 - A rep building a clear bad habit (leading with discounts, accepting walkaways, skipping urgency, never sitting down) gets a direct, specific callout on the habit and what it will cost them — even if they happened to close this one.
 
 ═══════════════════════════════════════════════════════════════
+QUESTION-LED LEADERSHIP — STOP MISLABELING IT AS PERMISSION-SEEKING
+═══════════════════════════════════════════════════════════════
+
+This is critical. The Aira approach is QUESTION-DRIVEN. The whole script is built on Conversation Control — the person asking the questions is leading. A rep who asks the prospect a series of questions whose answers are already obvious yeses based on what the prospect just said is doing exactly what we teach. That is leadership, not weakness.
+
+DO NOT confuse strategic questions with permission-seeking. They look similar on the page; they do completely different work psychologically.
+
+STRATEGIC QUESTIONS (correct technique — never dock for these):
+- Tie-downs: "Did you like the gym?", "Does it have everything you need?"
+- Confirmation that the rep already engineered to a yes: "Would that help you out at all?" (after the prospect just said cost was the issue — answer is obviously yes, this is the rep teeing up the offer with the prospect's own commitment)
+- Discovery isolation: "Is it more about the upfront cost that's stopping you from joining today?"
+- The "Make sense?" check-in
+- "Is that fair?" (after offering the Google Review Drop)
+- "Would you like me to grab that for you?" / "Would you like me to see if I can get that for you?" — these are NOT permission-seeking when the prospect just signaled they need help with cost. They are the rep handing leadership over to the prospect by letting them say yes to their own benefit. The yes is engineered before the question is asked.
+
+TRUE PERMISSION-SEEKING (DOCK for these — these create exits where forward motion was the move):
+- "Do you want to join?" — gives the prospect a binary choice including no
+- "Are you ready to sign up?" — same problem
+- "Would you like to do this today?" — same problem  
+- "What do you think?" after presenting price — opens a door to "I need to think about it"
+- "Should I get your ID?" instead of just asking for it
+
+THE TEST: did the question give the prospect an OUT they shouldn't have had at that moment? If yes, dock. If the question's answer was already obviously yes given what the prospect just said and committed to, that's a strategic question and you reward it. The Aira way is leading through stacked yeses — not bulldozing.
+
+When a rep asks "Would you like me to see if I can get that coupon for you?" after the prospect just admitted cost is the issue, you do NOT dock for permission-seeking. The prospect already said cost was the problem. The answer is obviously yes. The rep is leading them through it by handing the yes back to them. That is the technique. That is the script. Score it as a perfect execution of the Coupon Drop framing.
+
+═══════════════════════════════════════════════════════════════
 THE FORMULA — THIS IS EVERYTHING
 
 Every word a rep says creates a FEELING in the prospect. That feeling produces a RESPONSE. This is the foundation of everything in sales. The Aira script is one engineered sequence of words that reliably produces the right feelings — not the only sequence that can work, but the one we teach because it gives a new franchisee a structure they can lean on while they develop psychology fluency of their own.
@@ -172,7 +199,7 @@ SIT-DOWN PRESENTATION (0-25): Did the rep deliver the sit-down before the price 
 
 OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offer? Objection isolated before discount offered? Coupon Drop used only after cost confirmed? Payment-timing solution attempted before the Google Review Drop when the objection was timing-based (do not dock if the rep closed at full price via post-dating or split billing — that's a better outcome than waiving the enrollment)? Google Review Drop used only as last resort? Drops used in correct sequence?
 
-LANGUAGE AND PSYCHOLOGY (0-25): Assumptive vs permission-seeking language? Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness?
+LANGUAGE AND PSYCHOLOGY (0-25): Reward question-led leadership — tie-downs, strategic questions whose answer is obvious yes ("Would that help you out?", "Is that fair?", "Would you like me to grab that?"), and "Make sense?" check-ins are the technique, not weaknesses (see QUESTION-LED LEADERSHIP section above). ONLY dock for TRUE permission-seeking ("Do you want to join?", "Are you ready?", "What do you think?" after pricing) — questions that gave the prospect an out where forward motion was the move. Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness?
 
 CLOSE EXECUTION (0-25): Direct assumptive close attempted? Re-closed after objections without skipping sequence? By The Way Close used at end of free pass visit if applicable? PIF offered after sign-up? Referrals collected at point of sale?
 
@@ -610,7 +637,7 @@ async function scorePracticeSession(session_id) {
   try {
     const sc = await scoreTranscript(transcript);
     console.log(`[Practice] score complete: ${sc.total_score}/100 closed=${sc.did_close}`);
-    return sc;
+    return { scorecard: sc, messages: session.messages.slice() };
   } catch (err) {
     console.error(`[Practice] scoring failed for session ${session_id}:`, err.message);
     throw err;
