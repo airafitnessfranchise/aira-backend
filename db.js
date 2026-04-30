@@ -110,6 +110,16 @@ async function initDb() {
     `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'practice'`,
   );
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS players (
+      player_id    TEXT PRIMARY KEY,
+      email        TEXT UNIQUE NOT NULL,
+      display_name TEXT,
+      location_id  TEXT,
+      created_at   TIMESTAMPTZ DEFAULT NOW(),
+      last_seen    TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS custom_locations (
       location_id      TEXT PRIMARY KEY,
       franchise_name   TEXT NOT NULL,
@@ -490,6 +500,99 @@ async function getGameLeaderboard(limit = 25) {
   }));
 }
 
+// ─── Players (game identity by email — progress follows the rep across devices) ───
+
+async function findOrCreatePlayer({
+  email,
+  name,
+  location_id,
+  claim_player_id,
+}) {
+  const lower = String(email || "")
+    .toLowerCase()
+    .trim();
+  if (!lower) throw new Error("Email is required");
+
+  // Email lookup
+  const existing = await pool.query(
+    "SELECT * FROM players WHERE LOWER(email) = $1",
+    [lower],
+  );
+  if (existing.rows.length > 0) {
+    const player = existing.rows[0];
+    // Refresh last_seen + optionally update name/location if newly provided
+    await pool.query(
+      `UPDATE players
+       SET last_seen = NOW(),
+           display_name = COALESCE(NULLIF($1, ''), display_name),
+           location_id = COALESCE(NULLIF($2, ''), location_id)
+       WHERE player_id = $3`,
+      [name || "", location_id || "", player.player_id],
+    );
+    // If this browser had a different cookie player_id with practice sessions, claim them
+    if (claim_player_id && claim_player_id !== player.player_id) {
+      const { rowCount } = await pool.query(
+        `UPDATE practice_sessions
+         SET player_id = $1, player_name = COALESCE(player_name, $2)
+         WHERE player_id = $3 AND mode = 'game'`,
+        [
+          player.player_id,
+          player.display_name || name || null,
+          claim_player_id,
+        ],
+      );
+      if (rowCount > 0) {
+        console.log(
+          `[Players] Claimed ${rowCount} prior session(s) from ${claim_player_id} → ${player.player_id} (${lower})`,
+        );
+      }
+    }
+    return {
+      ...player,
+      claimed: claim_player_id && claim_player_id !== player.player_id,
+    };
+  }
+
+  // No player with this email — create one. Reuse the cookie's player_id if provided
+  // so any sessions already saved under it stay attached automatically.
+  const { v4: uuidv4 } = require("uuid");
+  const player_id = claim_player_id || uuidv4();
+  await pool.query(
+    `INSERT INTO players (player_id, email, display_name, location_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (player_id) DO NOTHING`,
+    [player_id, lower, name || null, location_id || null],
+  );
+  console.log(`[Players] Created new player ${player_id} (${lower})`);
+  return {
+    player_id,
+    email: lower,
+    display_name: name || null,
+    location_id: location_id || null,
+    claimed: false,
+  };
+}
+
+async function getPlayerByEmail(email) {
+  const { rows } = await pool.query(
+    "SELECT * FROM players WHERE LOWER(email) = $1",
+    [
+      String(email || "")
+        .toLowerCase()
+        .trim(),
+    ],
+  );
+  return rows[0] || null;
+}
+
+async function getPlayerById(player_id) {
+  const { rows } = await pool.query(
+    "SELECT * FROM players WHERE player_id = $1",
+    [player_id],
+  );
+  return rows[0] || null;
+}
+
 module.exports = {
   initDb,
   createRecording,
@@ -509,4 +612,7 @@ module.exports = {
   getCustomLocations,
   addCustomLocation,
   deleteCustomLocation,
+  findOrCreatePlayer,
+  getPlayerByEmail,
+  getPlayerById,
 };

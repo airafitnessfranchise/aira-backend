@@ -2156,6 +2156,47 @@ app.post("/practice/end", async (req, res) => {
 
 // ─────────── AIRA FITNESS CLOSING GAME ───────────
 
+// Identify a player by email. Returns the canonical player_id. If a cookie player_id
+// is supplied AND it has prior sessions, those sessions get claimed for this email.
+app.post(
+  "/airafitnessclosinggame/identify",
+  express.json(),
+  async (req, res) => {
+    try {
+      const email = String(req.body.email || "").trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res
+          .status(400)
+          .json({ ok: false, error: "Valid email required" });
+      }
+      const name = String(req.body.name || "").trim();
+      const location_id = req.body.location_id
+        ? canonicalLocationId(req.body.location_id)
+        : null;
+      const claim_player_id = req.body.claim_player_id
+        ? String(req.body.claim_player_id)
+        : null;
+      const player = await db.findOrCreatePlayer({
+        email,
+        name,
+        location_id,
+        claim_player_id,
+      });
+      res.json({
+        ok: true,
+        player_id: player.player_id,
+        email: player.email,
+        display_name: player.display_name,
+        location_id: player.location_id,
+        claimed: !!player.claimed,
+      });
+    } catch (err) {
+      console.error("[Game] identify error:", err.message);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  },
+);
+
 app.get("/airafitnessclosinggame/progress", async (req, res) => {
   try {
     const player_id = req.query.player_id;
@@ -2609,9 +2650,11 @@ body::after{
       <h1>Become an Expert Closer</h1>
       <p class="tag">Five levels. Eleven prospects. Every objection you'll hear on the floor — simulated, scored, and coached. Beat each level to unlock the next. <b>Let's see how good you really are.</b></p>
       <div class="start-card">
-        <label><span>Your Name (display only)</span><input id="player-name" placeholder="e.g. Alex" maxlength="32" /></label>
+        <label><span>Your Email <span style="color:#EC4899;">*</span></span><input id="player-email" type="email" placeholder="you@airafitness.com" required autocomplete="email" /></label>
+        <label><span>Your Name</span><input id="player-name" placeholder="e.g. Alex" maxlength="32" autocomplete="name" /></label>
         <label><span>Your Gym</span><select id="location"><option value="">— Select your gym —</option>${locOptions}</select></label>
         <button class="btn-primary" id="enter-btn">Enter the Game →</button>
+        <div style="margin-top:14px;font-size:12px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.55;">Your progress is saved to your email — sign in from any device to pick up where you left off.</div>
       </div>
     </div>
 
@@ -2668,29 +2711,51 @@ body::after{
 <script>
 const LEVELS = ${JSON.stringify(levelData)};
 const $ = (id) => document.getElementById(id);
-let PLAYER = { id: null, name: null, location_id: null, xp: 0, closes: 0, attempts: 0, scenarios_passed: [], highest_level: 1 };
+let PLAYER = { id: null, email: null, name: null, location_id: null, xp: 0, closes: 0, attempts: 0, scenarios_passed: [], highest_level: 1 };
 let SESSION_ID = null;
 let CURRENT_SCENARIO = null;
 let CURRENT_LEVEL = null;
 
 // ─── identity / progress ───
-function ensurePlayerId(){
-  let id = (document.cookie.match(/aira_player_id=([^;]+)/)||[])[1];
-  if (!id){
-    id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('p_'+Math.random().toString(36).slice(2)+Date.now());
-    document.cookie = 'aira_player_id=' + encodeURIComponent(id) + '; path=/; max-age=15552000; SameSite=Lax';
-  }
-  return decodeURIComponent(id);
+// Email is the source of truth — same email on any device gets the same progress.
+// We still read/write a cookie for instant re-entry, but identification on the
+// server is keyed by email, not the cookie.
+function getCookiePlayerId(){
+  const id = (document.cookie.match(/aira_player_id=([^;]+)/)||[])[1];
+  return id ? decodeURIComponent(id) : null;
+}
+function setPlayerCookies(id, email){
+  document.cookie = 'aira_player_id=' + encodeURIComponent(id) + '; path=/; max-age=15552000; SameSite=Lax';
+  if (email) document.cookie = 'aira_player_email=' + encodeURIComponent(email) + '; path=/; max-age=15552000; SameSite=Lax';
 }
 function loadCachedProfile(){
+  const e = (document.cookie.match(/aira_player_email=([^;]+)/)||[])[1];
   const n = (document.cookie.match(/aira_player_name=([^;]+)/)||[])[1];
   const l = (document.cookie.match(/aira_player_location=([^;]+)/)||[])[1];
+  if (e) PLAYER.email = decodeURIComponent(e);
   if (n) PLAYER.name = decodeURIComponent(n);
   if (l) PLAYER.location_id = decodeURIComponent(l);
 }
 function saveProfile(){
+  if (PLAYER.email) document.cookie = 'aira_player_email=' + encodeURIComponent(PLAYER.email) + '; path=/; max-age=15552000; SameSite=Lax';
   if (PLAYER.name) document.cookie = 'aira_player_name=' + encodeURIComponent(PLAYER.name) + '; path=/; max-age=15552000; SameSite=Lax';
   if (PLAYER.location_id) document.cookie = 'aira_player_location=' + encodeURIComponent(PLAYER.location_id) + '; path=/; max-age=15552000; SameSite=Lax';
+}
+
+async function identifyPlayer(email, name, location_id){
+  const claim = getCookiePlayerId(); // if we already had a cookie session, claim its progress
+  const r = await fetch('/airafitnessclosinggame/identify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, name, location_id, claim_player_id: claim }),
+  });
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.error || 'identify failed');
+  PLAYER.id = d.player_id;
+  PLAYER.email = d.email;
+  if (d.display_name && !name) PLAYER.name = d.display_name;
+  setPlayerCookies(d.player_id, d.email);
+  return d;
 }
 
 async function fetchProgress(){
@@ -2731,15 +2796,26 @@ function refreshHeader(){
 
 // ─── splash ───
 $('enter-btn').onclick = async () => {
+  const email = $('player-email').value.trim();
   const name = $('player-name').value.trim();
   const loc = $('location').value;
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
   if (!loc) { alert('Pick your gym to continue'); return; }
-  PLAYER.id = ensurePlayerId();
-  PLAYER.name = name || 'Player';
-  PLAYER.location_id = loc;
-  saveProfile();
-  await fetchProgress();
-  showMap();
+  $('enter-btn').disabled = true;
+  $('enter-btn').textContent = 'Loading…';
+  try {
+    PLAYER.name = name || 'Player';
+    PLAYER.location_id = loc;
+    const ident = await identifyPlayer(email, name, loc);
+    saveProfile();
+    if (ident.claimed) console.log('[Game] Claimed prior progress for ' + email);
+    await fetchProgress();
+    showMap();
+  } catch (err) {
+    alert('Error: ' + err.message);
+    $('enter-btn').disabled = false;
+    $('enter-btn').textContent = 'Enter the Game →';
+  }
 };
 
 // ─── level map ───
@@ -2950,12 +3026,15 @@ function launchConfetti(){
 
 // ─── boot ───
 loadCachedProfile();
-PLAYER.id = ensurePlayerId();
-if (PLAYER.name && PLAYER.location_id){
-  $('player-name').value = PLAYER.name;
-  $('location').value = PLAYER.location_id;
+const cookiePlayerId = getCookiePlayerId();
+if (PLAYER.email && cookiePlayerId){
+  // Returning player — restore the form values, set the canonical id, and fetch progress.
+  PLAYER.id = cookiePlayerId;
+  $('player-email').value = PLAYER.email;
+  if (PLAYER.name) $('player-name').value = PLAYER.name;
+  if (PLAYER.location_id) $('location').value = PLAYER.location_id;
   fetchProgress().then(()=>{
-    if (PLAYER.attempts > 0) showMap(); // returning player goes straight in
+    if (PLAYER.attempts > 0) showMap(); // skip splash, go straight to level map
   });
 }
 </script>
