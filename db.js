@@ -57,6 +57,41 @@ async function initDb() {
       created_at      TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practice_sessions (
+      session_id      TEXT PRIMARY KEY,
+      location_id     TEXT,
+      difficulty      TEXT,
+      persona_label   TEXT,
+      messages        JSONB,
+      total_score     INTEGER DEFAULT 0,
+      sitdown_score   INTEGER DEFAULT 0,
+      objection_score INTEGER DEFAULT 0,
+      language_score  INTEGER DEFAULT 0,
+      close_score     INTEGER DEFAULT 0,
+      did_close       BOOLEAN DEFAULT FALSE,
+      ai_summary      TEXT DEFAULT '',
+      overall_coaching TEXT DEFAULT '',
+      sitdown_score_explainer TEXT DEFAULT '',
+      objection_score_explainer TEXT DEFAULT '',
+      language_score_explainer TEXT DEFAULT '',
+      close_score_explainer TEXT DEFAULT '',
+      sitdown_what_said TEXT DEFAULT '',
+      sitdown_what_to_say TEXT DEFAULT '',
+      sitdown_coaching TEXT DEFAULT '',
+      objection_what_said TEXT DEFAULT '',
+      objection_what_to_say TEXT DEFAULT '',
+      objection_coaching TEXT DEFAULT '',
+      language_what_said TEXT DEFAULT '',
+      language_what_to_say TEXT DEFAULT '',
+      language_coaching TEXT DEFAULT '',
+      close_what_said TEXT DEFAULT '',
+      close_what_to_say TEXT DEFAULT '',
+      close_coaching TEXT DEFAULT '',
+      process_warning TEXT DEFAULT '',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
   console.log("[DB] Tables ready");
 }
 
@@ -233,6 +268,83 @@ async function getScorecardHistory(recording_id) {
   return rows;
 }
 
+async function savePracticeSession({
+  session_id,
+  location_id,
+  difficulty,
+  persona_label,
+  messages,
+  scorecard,
+}) {
+  const sc = scorecard || {};
+  await pool.query(
+    `INSERT INTO practice_sessions (
+      session_id, location_id, difficulty, persona_label, messages,
+      total_score, sitdown_score, objection_score, language_score, close_score, did_close,
+      ai_summary, overall_coaching,
+      sitdown_score_explainer, objection_score_explainer, language_score_explainer, close_score_explainer,
+      sitdown_what_said, sitdown_what_to_say, sitdown_coaching,
+      objection_what_said, objection_what_to_say, objection_coaching,
+      language_what_said, language_what_to_say, language_coaching,
+      close_what_said, close_what_to_say, close_coaching,
+      process_warning
+    ) VALUES (
+      $1,$2,$3,$4,$5,
+      $6,$7,$8,$9,$10,$11,
+      $12,$13,
+      $14,$15,$16,$17,
+      $18,$19,$20,
+      $21,$22,$23,
+      $24,$25,$26,
+      $27,$28,$29,
+      $30
+    )
+    ON CONFLICT (session_id) DO NOTHING`,
+    [
+      session_id,
+      location_id,
+      difficulty,
+      persona_label,
+      JSON.stringify(messages),
+      sc.total_score || 0,
+      sc.sitdown_score || 0,
+      sc.objection_score || 0,
+      sc.language_score || 0,
+      sc.close_score || 0,
+      sc.did_close === true,
+      sc.ai_summary || "",
+      sc.overall_coaching || "",
+      sc.sitdown_score_explainer || "",
+      sc.objection_score_explainer || "",
+      sc.language_score_explainer || "",
+      sc.close_score_explainer || "",
+      sc.sitdown_what_said || "",
+      sc.sitdown_what_to_say || "",
+      sc.sitdown_coaching || "",
+      sc.objection_what_said || "",
+      sc.objection_what_to_say || "",
+      sc.objection_coaching || "",
+      sc.language_what_said || "",
+      sc.language_what_to_say || "",
+      sc.language_coaching || "",
+      sc.close_what_said || "",
+      sc.close_what_to_say || "",
+      sc.close_coaching || "",
+      sc.process_warning || "",
+    ],
+  );
+  console.log(
+    `[DB] Saved practice_session ${session_id} (${persona_label}, score: ${sc.total_score || 0})`,
+  );
+}
+
+async function getAllPracticeSessions() {
+  const { rows } = await pool.query(
+    "SELECT * FROM practice_sessions ORDER BY created_at DESC",
+  );
+  return rows;
+}
+
 module.exports = {
   initDb,
   createRecording,
@@ -245,4 +357,6 @@ module.exports = {
   getScorecardByRecording,
   getScorecardHistory,
   getAllScorecards,
+  savePracticeSession,
+  getAllPracticeSessions,
 };

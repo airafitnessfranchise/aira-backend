@@ -296,4 +296,173 @@ async function sendScorecardEmail(
   );
 }
 
-module.exports = { sendScorecardEmail };
+// ─────────── PRACTICE SESSION EMAIL ───────────
+// Same brand language as the consult scorecard email, plus the back-and-forth
+// conversation. Sent to MIKE_EMAIL only by default — practice is internal training data.
+
+function escapeHtmlMail(t) {
+  return String(t || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function sendPracticeEmail({
+  session_id,
+  location,
+  difficulty,
+  persona_label,
+  messages,
+  scorecard,
+}) {
+  const sc = scorecard || {};
+  const date = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const dateShort = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const totalColor =
+    (sc.total_score || 0) >= 70
+      ? BRAND_BLUE
+      : (sc.total_score || 0) >= 50
+        ? BRAND_BLUE_DARK
+        : ALERT_RED;
+
+  const subject = `Practice — ${location.franchise_name || "Aira Fitness"} — ${persona_label} Prospect — ${sc.total_score || 0}/100`;
+
+  const closedBadge =
+    sc.did_close === true
+      ? `<div style="display:inline-block;padding:6px 14px;background:${BRAND_BLACK};color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;"><span style="color:${BRAND_BLUE};">✓</span> Sale Closed</div>`
+      : `<div style="display:inline-block;padding:6px 14px;background:#fff;border:1px solid ${ALERT_RED};color:${ALERT_RED};border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;">No Sale</div>`;
+
+  const sections = [
+    ["Sit-Down Presentation", sc.sitdown_score, sc.sitdown_score_explainer],
+    ["Objection Handling", sc.objection_score, sc.objection_score_explainer],
+    ["Language & Psychology", sc.language_score, sc.language_score_explainer],
+    ["Close Execution", sc.close_score, sc.close_score_explainer],
+  ];
+  const barsHtml = sections
+    .map(([label, score, expl]) => scoreRowHtml(label, score || 0, 25, expl))
+    .join("");
+
+  const coachingHeader = coachingHeaderFor(sc);
+  const coachingBody = (sc.overall_coaching || sc.coaching_note || "").trim();
+  const coachingHtml =
+    coachingHeader && coachingBody
+      ? `<div style="margin:24px 0;padding:22px 24px;background:#fff;border:1px solid ${NEUTRAL_300};border-left:4px solid ${BRAND_BLUE};border-radius:6px;">
+        <div style="font-size:10px;font-weight:800;color:${BRAND_BLACK};text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;">${coachingHeader}</div>
+        <div style="font-size:14.5px;color:${NEUTRAL_900};line-height:1.7;"><p style="margin:0;">${coachingBody.replace(/\n\n+/g, '</p><p style="margin:12px 0 0;">').replace(/\n/g, " ")}</p></div>
+      </div>`
+      : "";
+
+  const conversationHtml =
+    messages && messages.length
+      ? `<div style="margin:24px 0;">
+        <div style="font-size:10px;font-weight:800;color:${NEUTRAL_500};text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;">The Conversation</div>
+        ${messages
+          .map((m) => {
+            const isRep = m.role === "user";
+            const lbl = isRep ? "YOU SAID" : "PROSPECT SAID";
+            const lblColor = isRep ? BRAND_BLUE : NEUTRAL_500;
+            const bg = isRep ? "#F0FBFF" : NEUTRAL_50;
+            const border = isRep ? "#BAE6FD" : NEUTRAL_300;
+            return `<div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:12px 14px;margin-bottom:8px;">
+            <div style="font-size:10px;font-weight:800;letter-spacing:.14em;color:${lblColor};margin-bottom:4px;">${lbl}</div>
+            <div style="font-size:13.5px;color:${NEUTRAL_900};line-height:1.55;">${escapeHtmlMail(m.content)}</div>
+          </div>`;
+          })
+          .join("")}
+      </div>`
+      : "";
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#EEF1F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:640px;margin:20px auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="background:${BRAND_BLACK};padding:28px 28px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;letter-spacing:.18em;line-height:1;">
+        <span style="color:${BRAND_BLUE};">AIRA</span><span style="color:#fff;">&nbsp;FITNESS</span>
+      </div>
+    </div>
+    <div style="background:#fff;padding:24px 28px 14px;border-bottom:3px solid ${BRAND_BLUE};">
+      <div style="font-size:10px;font-weight:800;color:${BRAND_BLUE};letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;">Practice Session</div>
+      <div style="font-size:24px;font-weight:900;color:${BRAND_BLACK};margin:0 0 4px;line-height:1.15;letter-spacing:-.01em;">${location.franchise_name || "Aira Fitness"}</div>
+      <div style="font-size:12px;color:${NEUTRAL_500};font-weight:500;">${date} &nbsp;·&nbsp; ${persona_label} Prospect (${difficulty})</div>
+    </div>
+    <div style="padding:24px 28px;">
+      <div style="text-align:center;padding:22px 18px;background:${NEUTRAL_50};border-radius:8px;margin-bottom:24px;">
+        <div style="font-size:10px;color:${NEUTRAL_500};text-transform:uppercase;letter-spacing:.14em;font-weight:800;">Overall Score</div>
+        <div style="font-size:54px;font-weight:900;color:${totalColor};line-height:1.05;margin-top:6px;letter-spacing:-.02em;">${sc.total_score || 0}<span style="font-size:20px;color:${NEUTRAL_500};font-weight:600;letter-spacing:0;"> / 100</span></div>
+        ${closedBadge}
+      </div>
+      ${barsHtml ? `<div style="margin:8px 0 20px;">${barsHtml}</div>` : ""}
+      ${
+        sc.ai_summary
+          ? `<div style="padding:16px 18px;background:${NEUTRAL_50};border-left:3px solid ${BRAND_BLUE};border-radius:4px;margin:20px 0 16px;">
+        <div style="font-size:10px;font-weight:800;color:${BRAND_BLUE_DARK};text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">Summary</div>
+        <div style="font-size:14px;color:${NEUTRAL_900};line-height:1.6;">${sc.ai_summary}</div>
+      </div>`
+          : ""
+      }
+      ${coachingHtml}
+      ${conversationHtml}
+    </div>
+    <div style="background:${BRAND_BLACK};padding:14px 28px;text-align:center;font-size:11px;color:#9ca3af;">
+      <div style="color:#fff;font-weight:600;margin-bottom:2px;">Practice session — internal training data</div>
+      <div style="color:${BRAND_BLUE};font-weight:700;letter-spacing:.1em;font-size:10px;text-transform:uppercase;">Aira Fitness</div>
+    </div>
+  </div>
+</body></html>`;
+
+  const text = [
+    `${(location.franchise_name || "Aira Fitness").toUpperCase()} — PRACTICE SESSION`,
+    `${persona_label} Prospect (${difficulty}) — ${date}`,
+    "",
+    `Overall Score: ${sc.total_score || 0}/100  ${sc.did_close ? "(Sale Closed)" : "(No Sale)"}`,
+    "",
+    sections
+      .map(([l, sv, e]) => `${l}: ${sv || 0}/25${e ? "\n  " + e : ""}`)
+      .join("\n"),
+    "",
+    sc.ai_summary ? `Summary:\n${sc.ai_summary}` : "",
+    coachingBody ? `\n--- ${coachingHeader} ---\n${coachingBody}` : "",
+    "",
+    "--- Conversation ---",
+    (messages || [])
+      .map(
+        (m) =>
+          (m.role === "user" ? "YOU SAID: " : "PROSPECT SAID: ") + m.content,
+      )
+      .join("\n\n"),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const recipients = [MIKE_EMAIL];
+  console.log(
+    `[Practice Email] Sending session ${session_id} to: ${recipients.join(", ")}`,
+  );
+
+  const { data, error } = await resend.emails.send({
+    from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+    to: recipients,
+    subject,
+    text,
+    html,
+  });
+
+  if (error) {
+    console.error("[Practice Email] Resend rejected:", JSON.stringify(error));
+    throw new Error("Resend error: " + JSON.stringify(error));
+  }
+  console.log(
+    `[Practice Email] Delivered — id: ${data?.id} — score: ${sc.total_score || 0}`,
+  );
+}
+
+module.exports = { sendScorecardEmail, sendPracticeEmail };

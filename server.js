@@ -23,7 +23,7 @@ const {
   getPracticeSession,
   scorePracticeSession,
 } = require("./ai");
-const { sendScorecardEmail } = require("./email");
+const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
 const vpRoutes = require("./vp-routes");
 
@@ -1179,10 +1179,42 @@ app.post("/practice/end", async (req, res) => {
       });
     }
     const result = await scorePracticeSession(session_id);
+
+    // Persist BEFORE responding so the corpus is durable even if the client disconnects.
+    const location = byLocationId[session.location_id] || {
+      location_id: session.location_id || "unknown",
+      franchise_name: session.location_id || "Aira Fitness",
+    };
+    try {
+      await db.savePracticeSession({
+        session_id,
+        location_id: session.location_id || null,
+        difficulty: session.difficulty,
+        persona_label: session.persona.label,
+        messages: result.messages,
+        scorecard: result.scorecard,
+      });
+    } catch (dbErr) {
+      console.error("[Practice] DB save failed:", dbErr.message);
+      // don't fail the user-facing response — the scorecard still renders
+    }
+
     res.json({
       ok: true,
       scorecard: result.scorecard,
       messages: result.messages,
+    });
+
+    // Fire-and-forget email — don't block the response.
+    sendPracticeEmail({
+      session_id,
+      location,
+      difficulty: session.difficulty,
+      persona_label: session.persona.label,
+      messages: result.messages,
+      scorecard: result.scorecard,
+    }).catch((emailErr) => {
+      console.error("[Practice] email failed:", emailErr.message);
     });
   } catch (err) {
     console.error("[Practice] end error:", err.message);
