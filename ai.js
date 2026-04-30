@@ -750,7 +750,7 @@ function pickScenario(difficulty, recentlySeenIds) {
 // In-memory practice sessions. Map<session_id, { difficulty, persona, messages, location_id, started_at }>
 // Cleared after 30 minutes of inactivity. v0 — no DB persistence yet.
 const practiceSessions = new Map();
-const PRACTICE_SESSION_TTL_MS = 30 * 60 * 1000;
+const PRACTICE_SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours — gives slow testers + folks who pause room to finish
 setInterval(
   () => {
     const cutoff = Date.now() - PRACTICE_SESSION_TTL_MS;

@@ -573,6 +573,69 @@ async function findOrCreatePlayer({
   };
 }
 
+// Current consecutive-day streak for a player. Counts distinct dates the player
+// played a game-mode session. Streak = consecutive days ending today (or yesterday
+// — today not played yet doesn't break the streak until midnight passes).
+async function getPlayerStreak(player_id) {
+  if (!player_id) return { current: 0, longest: 0, days_played: 0 };
+  const { rows } = await pool.query(
+    `SELECT DISTINCT DATE(created_at AT TIME ZONE 'America/Chicago') AS d
+     FROM practice_sessions
+     WHERE player_id = $1 AND mode = 'game'
+     ORDER BY d DESC`,
+    [player_id],
+  );
+  if (rows.length === 0) return { current: 0, longest: 0, days_played: 0 };
+
+  // Convert to date strings for compare; use America/Chicago "today"
+  const today = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Chicago" }),
+  );
+  today.setHours(0, 0, 0, 0);
+  const days = rows.map((r) => {
+    const d = new Date(r.d);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  });
+  const DAY = 86400000;
+
+  // Current streak — anchored on today OR yesterday (so playing yesterday but not yet today is still a streak)
+  let current = 0;
+  let cursor = today.getTime();
+  if (days.includes(cursor)) {
+    current = 1;
+    cursor -= DAY;
+  } else if (days.includes(cursor - DAY)) {
+    current = 1;
+    cursor = cursor - 2 * DAY;
+  } else {
+    current = 0;
+  }
+  while (current > 0 && days.includes(cursor)) {
+    current++;
+    cursor -= DAY;
+  }
+
+  // Longest streak in history
+  let longest = 1;
+  let run = 1;
+  for (let i = 1; i < days.length; i++) {
+    if (days[i - 1] - days[i] === DAY) {
+      run++;
+      if (run > longest) longest = run;
+    } else {
+      run = 1;
+    }
+  }
+
+  return {
+    current,
+    longest: Math.max(longest, current),
+    days_played: days.length,
+    last_played: rows[0].d,
+  };
+}
+
 async function getPlayerByEmail(email) {
   const { rows } = await pool.query(
     "SELECT * FROM players WHERE LOWER(email) = $1",
@@ -615,4 +678,5 @@ module.exports = {
   findOrCreatePlayer,
   getPlayerByEmail,
   getPlayerById,
+  getPlayerStreak,
 };

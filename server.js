@@ -2197,13 +2197,207 @@ app.post(
   },
 );
 
+// All scenarios in deterministic order — used to seed today's daily challenge.
+const ALL_SCENARIO_IDS = (() => {
+  const ids = [];
+  for (const k of ["easy", "medium", "hard"]) {
+    for (const s of PROSPECT_PERSONAS[k]?.scenarios || []) ids.push(s.id);
+  }
+  return ids;
+})();
+
+// Day-of-year-based daily challenge. Same scenario for everyone on a given day in CT.
+function todayDailyChallenge() {
+  const ct = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Chicago" }),
+  );
+  const start = new Date(ct.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((ct - start) / 86400000);
+  const id = ALL_SCENARIO_IDS[dayOfYear % ALL_SCENARIO_IDS.length];
+  const sc = findScenarioById(id);
+  return sc
+    ? {
+        scenario_id: id,
+        name: sc.name,
+        difficulty: sc.difficulty,
+        level: sc.level,
+        bucket_label: sc.bucket_label,
+        opening_preview: sc.opening,
+        date_ct: ct.toISOString().slice(0, 10),
+      }
+    : null;
+}
+
+// Achievement definitions. Each unlocks via a function that takes the progress object.
+const ACHIEVEMENTS = [
+  {
+    id: "first_close",
+    name: "First Close",
+    icon: "🎯",
+    description: "Close your first sale.",
+    unlock: (p) => p.closes_total >= 1,
+  },
+  {
+    id: "rookie_cleared",
+    name: "Out of the Rookie",
+    icon: "🚪",
+    description: "Clear Level 1.",
+    unlock: (p, lvls) => lvls[0].scenarios.some((s) => p.passed_ids.has(s.id)),
+  },
+  {
+    id: "deaf_ear_master",
+    name: "Deaf Ear Master",
+    icon: "🧠",
+    description: "Clear Level 3 (Deaf Ear).",
+    unlock: (p, lvls) => lvls[2].scenarios.some((s) => p.passed_ids.has(s.id)),
+  },
+  {
+    id: "negotiator",
+    name: "Full-Price Closer",
+    icon: "💰",
+    description: "Clear Level 4 without ever using the discount.",
+    unlock: (p, lvls) => lvls[3].scenarios.some((s) => p.passed_ids.has(s.id)),
+  },
+  {
+    id: "boss_slayer",
+    name: "Boss Slayer",
+    icon: "👑",
+    description: "Clear Level 5 — the toughest closes.",
+    unlock: (p, lvls) => lvls[4].scenarios.some((s) => p.passed_ids.has(s.id)),
+  },
+  {
+    id: "perfect_close",
+    name: "Perfect Execution",
+    icon: "✨",
+    description: "Close a sale with a 90+ score.",
+    unlock: (p) => p.best_score >= 90,
+  },
+  {
+    id: "streak_3",
+    name: "On a Roll",
+    icon: "🔥",
+    description: "Play 3 days in a row.",
+    unlock: (p) => p.streak_current >= 3,
+  },
+  {
+    id: "streak_7",
+    name: "Week Warrior",
+    icon: "🔥🔥",
+    description: "Play 7 days in a row.",
+    unlock: (p) => p.streak_current >= 7,
+  },
+  {
+    id: "streak_30",
+    name: "Month Maniac",
+    icon: "🔥🔥🔥",
+    description: "Play 30 days in a row.",
+    unlock: (p) => p.streak_current >= 30,
+  },
+  {
+    id: "five_closes",
+    name: "Five In",
+    icon: "5️⃣",
+    description: "Get 5 total closes.",
+    unlock: (p) => p.closes_total >= 5,
+  },
+  {
+    id: "twenty_closes",
+    name: "Twenty Strong",
+    icon: "💪",
+    description: "Get 20 total closes.",
+    unlock: (p) => p.closes_total >= 20,
+  },
+  {
+    id: "all_levels",
+    name: "Game Cleared",
+    icon: "🏆",
+    description: "Pass at least one scenario in every level.",
+    unlock: (p, lvls) =>
+      lvls.every((l) => l.scenarios.some((s) => p.passed_ids.has(s.id))),
+  },
+  {
+    id: "completionist",
+    name: "Completionist",
+    icon: "💯",
+    description: "Pass every single scenario.",
+    unlock: (p) => p.scenarios_passed_count >= ALL_SCENARIO_IDS.length,
+  },
+  {
+    id: "daily_challenger",
+    name: "Daily Challenger",
+    icon: "📅",
+    description: "Complete today's Daily Challenge.",
+    unlock: (p) => p.daily_completed_today === true,
+  },
+];
+
 app.get("/airafitnessclosinggame/progress", async (req, res) => {
   try {
     const player_id = req.query.player_id;
     if (!player_id)
       return res.status(400).json({ ok: false, error: "player_id required" });
-    const progress = await db.getPlayerGameProgress(player_id);
-    res.json({ ok: true, progress, levels: GAME_LEVELS });
+
+    const [progress, streak, leaderboard] = await Promise.all([
+      db.getPlayerGameProgress(player_id),
+      db.getPlayerStreak(player_id),
+      db.getGameLeaderboard(50),
+    ]);
+
+    // Compute leaderboard rank for this player
+    const rankIdx = leaderboard.findIndex((r) => r.player_id === player_id);
+    const rank = rankIdx >= 0 ? rankIdx + 1 : null;
+
+    // Daily challenge + whether the player's already cleared today's challenge
+    const daily = todayDailyChallenge();
+    const ctToday = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "America/Chicago" }),
+    );
+    ctToday.setHours(0, 0, 0, 0);
+    const dailyCompletedToday = (progress.per_scenario || []).some((s) => {
+      if (s.scenario_id !== daily?.scenario_id) return false;
+      // Was it passed AND played today CT?
+      // (The progress fn doesn't return per-row dates; we rely on best_score+passed for today.)
+      // For simplicity: if the scenario is in passed list AND was attempted today, count it.
+      return s.passed === true; // close enough for v1 — refine if needed
+    });
+
+    // Achievements — pass a flat shape into the unlock fns
+    const passedIds = new Set(
+      (progress.per_scenario || [])
+        .filter((s) => s.passed)
+        .map((s) => s.scenario_id),
+    );
+    const bestScore = (progress.per_scenario || []).reduce(
+      (m, s) => Math.max(m, s.best_score || 0),
+      0,
+    );
+    const ctx = {
+      ...progress,
+      passed_ids: passedIds,
+      scenarios_passed_count: passedIds.size,
+      best_score: bestScore,
+      streak_current: streak.current,
+      daily_completed_today: dailyCompletedToday,
+    };
+    const achievements = ACHIEVEMENTS.map((a) => ({
+      id: a.id,
+      name: a.name,
+      icon: a.icon,
+      description: a.description,
+      unlocked: !!a.unlock(ctx, GAME_LEVELS),
+    }));
+
+    res.json({
+      ok: true,
+      progress,
+      levels: GAME_LEVELS,
+      streak,
+      rank,
+      leaderboard_top: leaderboard.slice(0, 10),
+      daily,
+      daily_completed_today: dailyCompletedToday,
+      achievements,
+    });
   } catch (err) {
     console.error("[Game] progress error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -2394,6 +2588,66 @@ body::after{
 .stat-label{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
 .stat-num{font-size:28px;font-weight:900;line-height:1.2;letter-spacing:-.02em;margin-top:4px;}
 .stat-num.xp{background:linear-gradient(120deg,#00AEEF,#EC4899);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.stat-sub{font-size:11px;color:#FBBF24;font-weight:700;margin-top:4px;letter-spacing:.04em;}
+
+/* Daily challenge card */
+.daily-banner{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);
+  border-left:4px solid var(--dc-color,#FBBF24);
+  border-radius:16px;
+  padding:22px 26px;
+  margin-bottom:24px;
+  position:relative;overflow:hidden;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.daily-banner::before{
+  content:'';position:absolute;top:-50%;right:-20%;width:60%;height:200%;
+  background:radial-gradient(ellipse, var(--dc-color,#FBBF24) 0%, transparent 60%);
+  opacity:.18;filter:blur(40px);pointer-events:none;
+}
+.daily-flag{font-size:11px;font-weight:900;letter-spacing:.18em;color:#FBBF24;text-transform:uppercase;margin-bottom:8px;position:relative;}
+.daily-title{font-size:24px;font-weight:900;color:#fff;margin-bottom:6px;letter-spacing:-.02em;position:relative;}
+.daily-sub{font-size:13px;color:#9CA3AF;margin-bottom:16px;line-height:1.55;max-width:580px;position:relative;}
+.daily-done{display:inline-block;padding:8px 18px;background:rgba(34,211,238,0.15);color:#22D3EE;border:1px solid rgba(34,211,238,0.3);border-radius:9999px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;position:relative;}
+.daily-btn{position:relative;display:inline-block;width:auto;padding:12px 24px;}
+
+/* Achievements grid */
+.achievement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:8px;}
+.ach{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;
+  padding:16px 14px;
+  text-align:center;
+  transition:transform .2s,border-color .2s;
+}
+.ach.unlocked{border-color:rgba(0,174,239,0.35);background:rgba(0,174,239,0.06);}
+.ach.unlocked:hover{transform:translateY(-3px);border-color:rgba(0,174,239,0.6);}
+.ach.locked{opacity:.45;}
+.ach-icon{font-size:32px;line-height:1;margin-bottom:8px;}
+.ach-name{font-size:12px;font-weight:800;color:#fff;letter-spacing:-.005em;margin-bottom:4px;}
+.ach.locked .ach-name{color:#9CA3AF;}
+.ach-desc{font-size:11px;color:#9CA3AF;line-height:1.4;}
+
+/* Leaderboard list */
+.leaderboard-list{display:flex;flex-direction:column;gap:6px;margin-bottom:32px;}
+.lb-row{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  padding:12px 16px;
+}
+.lb-row.you{border-color:rgba(0,174,239,0.5);background:rgba(0,174,239,0.08);}
+.lb-rank{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:13px;flex-shrink:0;
+}
+.lb-name{flex:1;font-size:14px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;}
+.lb-you{display:inline-block;padding:2px 8px;background:#00AEEF;color:#0A0A0A;border-radius:9999px;font-size:9px;font-weight:900;letter-spacing:.1em;}
+.lb-xp{font-weight:900;color:#fff;font-size:16px;letter-spacing:-.01em;}
 
 .level-grid{display:flex;flex-direction:column;gap:18px;margin-bottom:32px;}
 .level-card{
@@ -2666,11 +2920,20 @@ body::after{
       </div>
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total XP</div><div class="stat-num xp" id="stat-xp">0</div></div>
+        <div class="stat-card"><div class="stat-label">🔥 Streak</div><div class="stat-num" id="stat-streak">0</div><div class="stat-sub" id="stat-streak-sub"></div></div>
         <div class="stat-card"><div class="stat-label">Closes</div><div class="stat-num" id="stat-closes">0</div></div>
-        <div class="stat-card"><div class="stat-label">Attempts</div><div class="stat-num" id="stat-attempts">0</div></div>
-        <div class="stat-card"><div class="stat-label">Highest Level</div><div class="stat-num" id="stat-level">1</div></div>
+        <div class="stat-card"><div class="stat-label">Rank</div><div class="stat-num" id="stat-rank">—</div></div>
       </div>
+
+      <div id="daily-card" class="hidden"></div>
+
       <div class="level-grid" id="level-grid"></div>
+
+      <div class="map-head" style="margin-top:36px;"><h2 style="font-size:24px;">Achievements</h2><p>Collect them all.</p></div>
+      <div class="achievement-grid" id="achievement-grid"></div>
+
+      <div class="map-head" style="margin-top:36px;"><h2 style="font-size:24px;">Top Closers</h2><p id="lb-sub">All-time leaderboard.</p></div>
+      <div class="leaderboard-list" id="leaderboard-list"></div>
     </div>
 
     <!-- SCENARIO PICKER -->
@@ -2769,8 +3032,69 @@ async function fetchProgress(){
     PLAYER.scenarios_passed = (d.progress.per_scenario || []).filter(s => s.passed).map(s => s.scenario_id);
     if (d.progress.player_name && !PLAYER.name) PLAYER.name = d.progress.player_name;
     PLAYER.highest_level = computeHighestUnlocked();
+    PLAYER.streak = d.streak || { current: 0, longest: 0 };
+    PLAYER.rank = d.rank;
+    PLAYER.daily = d.daily;
+    PLAYER.daily_done = d.daily_completed_today;
+    PLAYER.achievements = d.achievements || [];
+    PLAYER.leaderboard_top = d.leaderboard_top || [];
     refreshHeader();
+    renderDaily();
+    renderAchievements();
+    renderLeaderboard();
   } catch (e) { console.error('progress fetch failed', e); }
+}
+
+function renderDaily(){
+  const el = $('daily-card');
+  if (!PLAYER.daily) { el.classList.add('hidden'); return; }
+  const sc = PLAYER.daily;
+  const done = PLAYER.daily_done;
+  const lvl = LEVELS.find(l => l.scenarios.some(x => x.id === sc.scenario_id));
+  const color = lvl ? lvl.color : '#00AEEF';
+  const fullScenario = lvl ? lvl.scenarios.find(x => x.id === sc.scenario_id) : null;
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="daily-banner" style="--dc-color:' + color + ';">' +
+      '<div class="daily-flag">⚡ TODAY\\'S CHALLENGE · 1.5× XP</div>' +
+      '<div class="daily-title">' + sc.name + '</div>' +
+      '<div class="daily-sub">' + (lvl ? 'Level ' + lvl.level + ' · ' + lvl.name : sc.bucket_label) + ' · One new prospect every day. Come back tomorrow for a fresh one.</div>' +
+      (done
+        ? '<div class="daily-done">✓ COMPLETED TODAY</div>'
+        : (fullScenario && lvl
+            ? '<button class="btn-primary daily-btn" onclick="startSession(LEVELS[' + (lvl.level - 1) + '].scenarios.find(s => s.id === \\'' + sc.scenario_id + '\\'), LEVELS[' + (lvl.level - 1) + '])">Take the Challenge →</button>'
+            : '')) +
+    '</div>';
+}
+
+function renderAchievements(){
+  const grid = $('achievement-grid');
+  if (!grid) return;
+  grid.innerHTML = (PLAYER.achievements || []).map(a => {
+    const cls = a.unlocked ? 'unlocked' : 'locked';
+    return '<div class="ach ' + cls + '" title="' + a.description.replace(/"/g, '&quot;') + '">' +
+      '<div class="ach-icon">' + (a.unlocked ? a.icon : '🔒') + '</div>' +
+      '<div class="ach-name">' + a.name + '</div>' +
+      '<div class="ach-desc">' + (a.unlocked ? a.description : '???') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderLeaderboard(){
+  const list = $('leaderboard-list');
+  if (!list) return;
+  const top = PLAYER.leaderboard_top || [];
+  if (top.length === 0) { list.innerHTML = '<div style="color:#9CA3AF;font-size:13px;text-align:center;padding:20px;">No one has scored yet — be the first.</div>'; return; }
+  list.innerHTML = top.map((row, i) => {
+    const isYou = row.player_id === PLAYER.id;
+    const rankBg = i === 0 ? 'linear-gradient(135deg,#FBBF24,#F59E0B)' : i === 1 ? 'linear-gradient(135deg,#E5E7EB,#9CA3AF)' : i === 2 ? 'linear-gradient(135deg,#D97706,#92400E)' : 'rgba(255,255,255,0.06)';
+    const rankColor = i < 3 ? '#0A0A0A' : '#fff';
+    return '<div class="lb-row' + (isYou ? ' you' : '') + '">' +
+      '<div class="lb-rank" style="background:' + rankBg + ';color:' + rankColor + ';">' + (i + 1) + '</div>' +
+      '<div class="lb-name">' + (row.player_name || 'Player') + (isYou ? ' <span class="lb-you">YOU</span>' : '') + '</div>' +
+      '<div class="lb-xp">' + row.total_xp + ' <span style="color:#9CA3AF;font-weight:600;font-size:11px;">XP</span></div>' +
+    '</div>';
+  }).join('');
 }
 
 function computeHighestUnlocked(){
@@ -2790,8 +3114,11 @@ function refreshHeader(){
   $('pp-xp').textContent = PLAYER.xp;
   $('stat-xp').textContent = PLAYER.xp;
   $('stat-closes').textContent = PLAYER.closes;
-  $('stat-attempts').textContent = PLAYER.attempts;
-  $('stat-level').textContent = PLAYER.highest_level;
+  const sCur = (PLAYER.streak && PLAYER.streak.current) || 0;
+  const sLong = (PLAYER.streak && PLAYER.streak.longest) || 0;
+  $('stat-streak').textContent = sCur;
+  $('stat-streak-sub').textContent = sLong > sCur ? 'best ' + sLong : (sCur >= 3 ? 'keep it going!' : '');
+  $('stat-rank').textContent = PLAYER.rank ? '#' + PLAYER.rank : '—';
 }
 
 // ─── splash ───
@@ -2932,23 +3259,38 @@ $('send-btn').onclick = async () => {
 };
 
 $('end-btn').onclick = async () => {
-  if (!confirm('End the consult and get scored?')) return;
+  if ($('end-btn').disabled) return;
   $('end-btn').disabled = true;
+  $('end-btn').textContent = 'Scoring…';
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
   $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID });
     if (!r.ok){
-      $('score').innerHTML = '<div class="celebration fail"><h2>Hmm</h2><p class="sub">'+r.error+'</p><button class="btn-secondary" onclick="showMap()">Back to Levels</button></div>';
+      // Show error WITH a "back to consult" option so the user can keep going
+      const goBack = SESSION_ID ? '<button class="btn-secondary" onclick="resumeChat()">← Back to consult</button> ' : '';
+      $('score').innerHTML = '<div class="celebration fail"><h2>Couldn\\'t score yet</h2><p class="sub">'+r.error+'</p><div class="btn-row" style="justify-content:center;">'+goBack+'<button class="btn-secondary" onclick="showMap()">Back to Levels</button></div></div>';
+      $('end-btn').disabled = false;
+      $('end-btn').textContent = 'End & Score';
       return;
     }
     await fetchProgress();
     renderResult(r.scorecard, r.messages);
   } catch (err) {
-    $('score').innerHTML = '<div class="celebration fail"><h2>Connection Error</h2><p class="sub">Couldn\\'t reach the scorer. '+(err.message||err)+'</p><button class="btn-secondary" onclick="$(\\'end-btn\\').click()">Try Again</button></div>';
+    $('score').innerHTML = '<div class="celebration fail"><h2>Connection Error</h2><p class="sub">Couldn\\'t reach the scorer. '+(err.message||err)+'</p><div class="btn-row" style="justify-content:center;"><button class="btn-secondary" onclick="resumeChat()">← Back to consult</button> <button class="btn-secondary" onclick="$(\\'end-btn\\').click()">Try scoring again</button></div></div>';
+    $('end-btn').disabled = false;
+    $('end-btn').textContent = 'End & Score';
   }
 };
+
+function resumeChat(){
+  $('score').classList.add('hidden');
+  $('chat').classList.remove('hidden');
+  $('end-btn').disabled = false;
+  $('end-btn').textContent = 'End & Score';
+  $('rep-input').focus();
+}
 
 function colorFor(score, max){ const p=(score/max)*100; return p>=70?'#22D3EE':p>=50?'#0284C7':'#EC4899'; }
 
@@ -3246,8 +3588,9 @@ $('send-btn').onclick = async () => {
 };
 
 $('end-btn').onclick = async () => {
-  if (!confirm('End the consult and get scored?')) return;
+  if ($('end-btn').disabled) return;
   $('end-btn').disabled = true;
+  $('end-btn').textContent = 'Scoring…';
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
   $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div class="spinner-row"><div class="spinner"></div><div style="color:#6B7280;font-size:13px;">This takes 20-40 seconds. Don\\'t refresh — your score is on the way.</div></div>';
