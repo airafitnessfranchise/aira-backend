@@ -750,7 +750,7 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="subhead"><div class="subhead-inner">
   <div class="eyebrow">Consult Recorder</div>
   <div class="title">Admin Dashboard</div>
-  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
+  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/admin/locations" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
 </div></div>
 <div class="wrap">
   <div class="kpi-grid">
@@ -905,6 +905,210 @@ tbody tr:hover{background:#F9FAFB;}
   } catch (err) {
     console.error("[Admin] Error:", err.message);
     res.status(500).send("Error loading admin: " + err.message);
+  }
+});
+
+// ─────────── /admin/locations — add gyms without touching code ───────────
+
+app.get("/admin/locations", adminAuth, async (req, res) => {
+  const customs = await db.getCustomLocations();
+  const allLocs = ALL_LOCATIONS.slice().sort((a, b) =>
+    (a.franchise_name || "").localeCompare(b.franchise_name || ""),
+  );
+  const flash = req.query.added
+    ? `<div class="flash" style="background:#ECFDF5;border-left:3px solid #00AEEF;color:#0A0A0A;">Added ${decodeURIComponent(String(req.query.added))} ✓</div>`
+    : "";
+  const flashDel = req.query.deleted
+    ? `<div class="flash" style="background:#FEF3F2;border-left:3px solid #DC2626;color:#0A0A0A;">Deleted ${decodeURIComponent(String(req.query.deleted))} ✓</div>`
+    : "";
+  const flashErr = req.query.err
+    ? `<div class="flash" style="background:#FEF3F2;border-left:3px solid #DC2626;color:#0A0A0A;">${decodeURIComponent(String(req.query.err))}</div>`
+    : "";
+
+  const rows = allLocs
+    .map((l) => {
+      const isCustom = !!l._custom;
+      return `<tr>
+      <td><div style="font-weight:700;color:#111827;">${l.franchise_name}</div><div style="font-size:11px;color:#6B7280;">${l.location_id}</div></td>
+      <td style="font-size:13px;color:#374151;">${l.franchisee_name || '<span style="color:#D1D5DB;">—</span>'}</td>
+      <td style="font-size:13px;color:#374151;">${l.franchisee_email || '<span style="color:#D1D5DB;">—</span>'}</td>
+      <td style="font-size:13px;color:#374151;">${l.vp_email || '<span style="color:#D1D5DB;">—</span>'}</td>
+      <td>${isCustom ? '<span style="display:inline-block;padding:2px 8px;background:#E0F4FB;color:#0284C7;border-radius:9999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Custom</span>' : '<span style="display:inline-block;padding:2px 8px;background:#F3F4F6;color:#6B7280;border-radius:9999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Built-in</span>'}</td>
+      <td style="text-align:right;">${isCustom ? `<form method="POST" action="/admin/locations/delete/${encodeURIComponent(l.location_id)}" style="display:inline;" onsubmit="return confirm('Delete ${l.franchise_name}?');"><button type="submit" style="background:transparent;border:0;color:#DC2626;font-weight:700;font-size:12px;cursor:pointer;">Delete</button></form>` : '<span style="color:#D1D5DB;font-size:11px;">in code</span>'}</td>
+    </tr>`;
+    })
+    .join("");
+
+  res.send(`<!DOCTYPE html><html><head><title>Aira Admin · Locations</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;}
+a{color:#0284C7;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:24px 28px;}
+.subhead-inner{max-width:1100px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px;}
+.title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
+.subtitle{font-size:13px;color:#6B7280;margin-top:4px;}
+.wrap{max-width:1100px;margin:0 auto;padding:24px;}
+.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;margin-bottom:16px;font-weight:600;}
+.back:hover{color:#0A0A0A;}
+.flash{padding:12px 16px;border-radius:6px;margin-bottom:18px;font-size:13px;font-weight:600;}
+.card{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:24px 26px;margin-bottom:22px;}
+.card h2{font-size:16px;font-weight:900;color:#0A0A0A;margin-bottom:6px;}
+.card .lead{font-size:13px;color:#6B7280;margin-bottom:18px;line-height:1.55;}
+.fld-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:700px){.fld-grid{grid-template-columns:1fr;}}
+.fld{display:block;}
+.fld span{display:block;font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;}
+.fld input{width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;font-family:inherit;background:#fff;color:#111827;}
+.fld input:focus{outline:none;border-color:#00AEEF;}
+.fld .hint{font-size:11px;color:#9CA3AF;margin-top:4px;font-weight:500;}
+.required{color:#DC2626;}
+button.cta{padding:12px 22px;background:#0A0A0A;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;font-family:inherit;}
+button.cta:hover{background:#1F2937;}
+table{width:100%;border-collapse:collapse;}
+thead th{background:#F9FAFB;padding:12px 14px;text-align:left;font-size:10px;color:#6B7280;font-weight:800;text-transform:uppercase;letter-spacing:.12em;border-bottom:1px solid #E5E7EB;}
+tbody td{padding:14px;border-bottom:1px solid #F3F4F6;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#F9FAFB;}
+.section-eyebrow{font-size:10px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;margin:8px 0 10px 4px;}
+</style></head><body>
+
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">Consult Recorder</div>
+  <div class="title">Locations</div>
+  <div class="subtitle">Add a new gym below. It'll show up everywhere — scorecards, dashboard, practice bot, the closing game — within seconds. No restart needed.</div>
+</div></div>
+
+<div class="wrap">
+  <a href="/admin" class="back">← Back to Admin</a>
+
+  ${flash}${flashDel}${flashErr}
+
+  <div class="card">
+    <h2>Add a new gym</h2>
+    <p class="lead">All scorecard emails will go to the franchisee email. Add a VP email to copy a regional director on every consult. Only the first three fields are required.</p>
+    <form method="POST" action="/admin/locations">
+      <div class="fld-grid">
+        <label class="fld"><span>Location ID <span class="required">*</span></span><input name="location_id" required placeholder="naples-01" pattern="[a-z0-9\\-]+" /><div class="hint">Lowercase letters, numbers, and hyphens. Like <code>naples-01</code> or <code>round-rock-02</code>.</div></label>
+        <label class="fld"><span>Franchise Name <span class="required">*</span></span><input name="franchise_name" required placeholder="Aira Fitness Naples" /><div class="hint">Display name on emails and the dashboard.</div></label>
+      </div>
+      <div class="fld-grid">
+        <label class="fld"><span>Franchisee Name</span><input name="franchisee_name" placeholder="Jane Smith" /><div class="hint">Shown in the email greeting. Leave blank for "<i>Aira Fitness Naples Team,</i>"</div></label>
+        <label class="fld"><span>Franchisee Email <span class="required">*</span></span><input name="franchisee_email" type="email" required placeholder="naples@airafitness.com" /><div class="hint">Primary recipient of every scorecard email.</div></label>
+      </div>
+      <div class="fld-grid">
+        <label class="fld"><span>VP Email</span><input name="vp_email" type="email" placeholder="vp@airafitness.com" /><div class="hint">Optional. Gets cc'd on scorecards from this gym.</div></label>
+        <label class="fld"><span>Club Email</span><input name="club_email" type="email" placeholder="" /><div class="hint">Optional. Additional copy.</div></label>
+      </div>
+      <div class="fld-grid">
+        <label class="fld"><span>GHL Calendar ID</span><input name="ghl_calendar_id" placeholder="" /><div class="hint">Optional. Used by the GHL webhook (currently disabled — leave blank if unsure).</div></label>
+        <div></div>
+      </div>
+      <button type="submit" class="cta">Add Gym</button>
+    </form>
+  </div>
+
+  <div class="section-eyebrow">All Gyms (${allLocs.length})</div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table>
+      <thead><tr>
+        <th>Gym</th>
+        <th>Franchisee</th>
+        <th>Franchisee Email</th>
+        <th>VP Email</th>
+        <th>Type</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+</div>
+</body></html>`);
+});
+
+app.post(
+  "/admin/locations",
+  adminAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    try {
+      const slug = String(req.body.location_id || "")
+        .trim()
+        .toLowerCase();
+      const franchise_name = String(req.body.franchise_name || "").trim();
+      const franchisee_email = String(req.body.franchisee_email || "").trim();
+      if (!/^[a-z0-9\-]+$/.test(slug)) {
+        return res.redirect(
+          "/admin/locations?err=" +
+            encodeURIComponent(
+              "Location ID must be lowercase letters, numbers, hyphens only",
+            ),
+        );
+      }
+      if (!franchise_name)
+        return res.redirect(
+          "/admin/locations?err=" +
+            encodeURIComponent("Franchise name is required"),
+        );
+      if (!franchisee_email)
+        return res.redirect(
+          "/admin/locations?err=" +
+            encodeURIComponent("Franchisee email is required"),
+        );
+      if (byLocationId[slug] && !byLocationId[slug]._custom) {
+        return res.redirect(
+          "/admin/locations?err=" +
+            encodeURIComponent(
+              `'${slug}' is already a built-in location — pick a different ID`,
+            ),
+        );
+      }
+      const loc = {
+        location_id: slug,
+        franchise_name,
+        franchisee_name: String(req.body.franchisee_name || "").trim(),
+        franchisee_email,
+        vp_email: String(req.body.vp_email || "").trim(),
+        club_email: String(req.body.club_email || "").trim(),
+        ghl_calendar_id: String(req.body.ghl_calendar_id || "").trim(),
+      };
+      await db.addCustomLocation(loc);
+      // refresh in-memory map
+      removeCustomLocationFromCache(slug);
+      await loadCustomLocations();
+      res.redirect(
+        "/admin/locations?added=" + encodeURIComponent(franchise_name),
+      );
+    } catch (err) {
+      console.error("[Admin/locations] add error:", err.message);
+      res.redirect("/admin/locations?err=" + encodeURIComponent(err.message));
+    }
+  },
+);
+
+app.post("/admin/locations/delete/:id", adminAuth, async (req, res) => {
+  try {
+    const slug = String(req.params.id).toLowerCase();
+    const existing = byLocationId[slug];
+    if (!existing || !existing._custom) {
+      return res.redirect(
+        "/admin/locations?err=" +
+          encodeURIComponent(
+            "Can't delete built-in locations (those are in code)",
+          ),
+      );
+    }
+    const name = existing.franchise_name;
+    await db.deleteCustomLocation(slug);
+    removeCustomLocationFromCache(slug);
+    res.redirect("/admin/locations?deleted=" + encodeURIComponent(name));
+  } catch (err) {
+    console.error("[Admin/locations] delete error:", err.message);
+    res.redirect("/admin/locations?err=" + encodeURIComponent(err.message));
   }
 });
 
@@ -2569,8 +2773,47 @@ app.post("/test/trigger", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// Merge any custom locations (added via /admin/locations) into the in-memory maps.
+// Called at startup AND after each add/delete so changes propagate without restart.
+async function loadCustomLocations() {
+  try {
+    const customs = await db.getCustomLocations();
+    for (const c of customs) {
+      const loc = {
+        location_id: c.location_id,
+        franchise_name: c.franchise_name,
+        franchisee_name: c.franchisee_name || "",
+        franchisee_email: c.franchisee_email,
+        vp_email: c.vp_email || undefined,
+        club_email: c.club_email || undefined,
+        ghl_calendar_id: c.ghl_calendar_id || "",
+        _custom: true,
+      };
+      byLocationId[loc.location_id] = loc;
+      if (loc.ghl_calendar_id) byCalendarId[loc.ghl_calendar_id] = loc;
+      if (!ALL_LOCATIONS.find((x) => x.location_id === loc.location_id)) {
+        ALL_LOCATIONS.push(loc);
+      }
+    }
+    console.log(`[Locations] Loaded ${customs.length} custom location(s)`);
+  } catch (err) {
+    console.error("[Locations] failed to load custom locations:", err.message);
+  }
+}
+
+function removeCustomLocationFromCache(location_id) {
+  const existing = byLocationId[location_id];
+  if (!existing || !existing._custom) return false;
+  delete byLocationId[location_id];
+  if (existing.ghl_calendar_id) delete byCalendarId[existing.ghl_calendar_id];
+  const idx = ALL_LOCATIONS.findIndex((x) => x.location_id === location_id);
+  if (idx >= 0) ALL_LOCATIONS.splice(idx, 1);
+  return true;
+}
+
 initDb()
   .then(async () => {
+    await loadCustomLocations();
     await runReaper();
     server.listen(PORT, () => {
       console.log("Aira backend running on port " + PORT);

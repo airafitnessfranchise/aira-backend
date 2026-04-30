@@ -109,7 +109,64 @@ async function initDb() {
   await pool.query(
     `ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS mode TEXT DEFAULT 'practice'`,
   );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS custom_locations (
+      location_id      TEXT PRIMARY KEY,
+      franchise_name   TEXT NOT NULL,
+      franchisee_name  TEXT DEFAULT '',
+      franchisee_email TEXT NOT NULL,
+      vp_email         TEXT DEFAULT '',
+      club_email       TEXT DEFAULT '',
+      ghl_calendar_id  TEXT DEFAULT '',
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
   console.log("[DB] Tables ready");
+}
+
+// ─── Custom locations (added via /admin/locations UI, merge with hardcoded locations.js) ───
+
+async function getCustomLocations() {
+  const { rows } = await pool.query(
+    `SELECT * FROM custom_locations ORDER BY created_at ASC`,
+  );
+  return rows;
+}
+
+async function addCustomLocation(loc) {
+  await pool.query(
+    `INSERT INTO custom_locations (
+      location_id, franchise_name, franchisee_name, franchisee_email, vp_email, club_email, ghl_calendar_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+    ON CONFLICT (location_id) DO UPDATE SET
+      franchise_name = EXCLUDED.franchise_name,
+      franchisee_name = EXCLUDED.franchisee_name,
+      franchisee_email = EXCLUDED.franchisee_email,
+      vp_email = EXCLUDED.vp_email,
+      club_email = EXCLUDED.club_email,
+      ghl_calendar_id = EXCLUDED.ghl_calendar_id`,
+    [
+      loc.location_id,
+      loc.franchise_name,
+      loc.franchisee_name || "",
+      loc.franchisee_email,
+      loc.vp_email || "",
+      loc.club_email || "",
+      loc.ghl_calendar_id || "",
+    ],
+  );
+  console.log(
+    `[DB] Saved custom location ${loc.location_id} (${loc.franchise_name})`,
+  );
+}
+
+async function deleteCustomLocation(location_id) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM custom_locations WHERE location_id = $1`,
+    [location_id],
+  );
+  console.log(`[DB] Deleted custom location ${location_id} (${rowCount} row)`);
+  return rowCount > 0;
 }
 
 // ─── Recordings ─────────────────────────────────────────
@@ -449,4 +506,7 @@ module.exports = {
   getAllPracticeSessions,
   getPlayerGameProgress,
   getGameLeaderboard,
+  getCustomLocations,
+  addCustomLocation,
+  deleteCustomLocation,
 };
