@@ -1268,6 +1268,9 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
 .coaching p:first-child{margin-top:0;}
 .coaching-header{font-size:11px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;}
 .btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
+.spinner-row{display:flex;align-items:center;gap:14px;margin-top:18px;}
+.spinner{width:20px;height:20px;border:2.5px solid #E5E7EB;border-top-color:#00AEEF;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
 .hidden{display:none !important;}
 </style></head><body>
@@ -1381,7 +1384,7 @@ $('end-btn').onclick = async () => {
   $('end-btn').disabled = true;
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
-  $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div style="color:#6B7280;font-size:13px;">This usually takes 10-15 seconds.</div>';
+  $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div class="spinner-row"><div class="spinner"></div><div style="color:#6B7280;font-size:13px;">This takes 20-40 seconds. Don\\'t refresh — your score is on the way.</div></div>';
   const r = await postJson('/practice/end', { session_id: SESSION_ID });
   if (!r.ok) { $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>'; return; }
   renderScorecard(r.scorecard);
@@ -1419,7 +1422,7 @@ function renderScorecard(s) {
     (s.ai_summary ? '<div class="score-summary">' + s.ai_summary + '</div>' : '') +
     catRows +
     coachingHtml +
-    '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button> <button class="cta secondary" onclick="window.location=\\'/admin\\'">Back to Admin</button></div>';
+    '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button> <a class="cta secondary" href="/admin" style="text-decoration:none;display:inline-block;">Back to Admin</a></div>';
 }
 </script>
 </body></html>`);
