@@ -2846,6 +2846,13 @@ body::after{
 .bubble.rep{background:linear-gradient(135deg,#0284C7,#00AEEF);color:#fff;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 16px rgba(0,174,239,0.25);}
 .bubble.thinking{background:rgba(255,255,255,0.04);color:#6B7280;align-self:flex-start;font-style:italic;border-bottom-left-radius:6px;}
 
+/* Scene-setter card */
+.scene-set{align-self:stretch;max-width:100%;background:linear-gradient(135deg,rgba(0,174,239,0.06),rgba(124,58,237,0.06));border:1px solid rgba(0,174,239,0.25);border-left:4px solid #00AEEF;border-radius:12px;padding:16px 18px;margin-bottom:6px;animation:fadeIn .25s ease-out;}
+.scene-eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:#22D3EE;text-transform:uppercase;margin-bottom:6px;}
+.scene-title{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.005em;margin-bottom:6px;}
+.scene-body{font-size:13.5px;color:#D1D5DB;line-height:1.6;}
+.scene-body b{color:#fff;font-weight:700;}
+
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:10px;align-items:flex-end;}
 .chat-input textarea{
   flex:1;padding:12px 16px;
@@ -3328,8 +3335,20 @@ async function startSession(sc, lvl){
   });
   if (!r.ok) { alert('Error: ' + r.error); return; }
   SESSION_ID = r.session_id;
+  sceneSet(sc.name);
   bubble('prospect', r.opening);
   $('rep-input').focus();
+}
+
+function sceneSet(name){
+  const div = document.createElement('div');
+  div.className = 'scene-set';
+  div.innerHTML =
+    '<div class="scene-eyebrow">📍 Scene</div>' +
+    '<div class="scene-title">You just finished the tour.</div>' +
+    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the sit-down</b> — month-to-month, no contracts, first + last + enrollment fee, like every other gym, ending with <b>"Make sense?"</b> Then present the three tiers and assumptive close.</div>';
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
 }
 
 function bubble(role, text){
@@ -3896,6 +3915,19 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
 .bubble.rep{background:linear-gradient(135deg,#0284C7,#00AEEF);color:#fff;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 16px rgba(0,174,239,0.25);}
 .bubble.thinking{background:rgba(255,255,255,0.04);color:#6B7280;align-self:flex-start;font-style:italic;border-bottom-left-radius:6px;}
 
+/* Scene-setter card — appears once at start of each consult */
+.scene-set{
+  align-self:stretch;max-width:100%;
+  background:linear-gradient(135deg,rgba(0,174,239,0.06),rgba(124,58,237,0.06));
+  border:1px solid rgba(0,174,239,0.25);border-left:4px solid #00AEEF;
+  border-radius:12px;padding:16px 18px;margin-bottom:6px;
+  animation:fadeIn .25s ease-out;
+}
+.scene-eyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:#22D3EE;text-transform:uppercase;margin-bottom:6px;}
+.scene-title{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.005em;margin-bottom:6px;}
+.scene-body{font-size:13.5px;color:#D1D5DB;line-height:1.6;}
+.scene-body b{color:#fff;font-weight:700;}
+
 /* Coach hints — dark glass with brand-blue (on-track) or amber (off-track) */
 .coach-bubble{align-self:stretch;max-width:100%;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-left:4px solid #F59E0B;border-radius:12px;padding:14px 16px;margin:2px 0;animation:fadeIn .25s ease-out;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 .coach-bubble.on{background:rgba(34,197,94,0.06);border-color:rgba(34,197,94,0.3);border-left-color:#22C55E;}
@@ -4066,9 +4098,22 @@ $('start-btn').onclick = async () => {
   $('persona-label').textContent = r.persona_label + (r.persona_name ? ' — ' + r.persona_name : '') + (COACH_MODE ? ' · 💡 COACHED MODE' : '');
   $('start').classList.add('hidden');
   $('chat').classList.remove('hidden');
+  // Scene-set card so franchisees know exactly where they are in the consult
+  sceneSet(r.persona_name || 'the prospect');
   bubble('prospect', r.opening);
   $('rep-input').focus();
 };
+
+function sceneSet(name) {
+  const div = document.createElement('div');
+  div.className = 'scene-set';
+  div.innerHTML =
+    '<div class="scene-eyebrow">📍 Scene</div>' +
+    '<div class="scene-title">You just finished the tour.</div>' +
+    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the sit-down</b> — month-to-month, no contracts, first + last + enrollment fee, like every other gym, ending with <b>"Make sense?"</b> Then present the three tiers and assumptive close.</div>';
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+}
 
 const repInput = $('rep-input');
 repInput.addEventListener('input', () => { repInput.style.height = 'auto'; repInput.style.height = Math.min(repInput.scrollHeight, 140) + 'px'; });
@@ -4175,7 +4220,7 @@ function renderScorecard(s, messages) {
   const win = passed;
 
   const headline = win ? (total >= 90 ? 'PERFECT EXECUTION' : 'STRONG WORK') : (closed ? 'CLOSED — BUT NOT QUITE' : 'PROSPECT WALKED');
-  const sub = win ? 'You scored ' + total + ' and closed the sale. That's the bar.' : (closed ? 'You closed at ' + total + ' — passing the bar (in the game) requires 70+ AND a closed sale.' : 'No sale today. Read the coaching below — the script knows where the gap was.');
+  const sub = win ? ('You scored ' + total + ' and closed the sale. That is the bar.') : (closed ? ('You closed at ' + total + ' — passing the bar (in the game) requires 70+ AND a closed sale.') : 'No sale today. Read the coaching below — the script knows where the gap was.');
 
   const sections = [
     ['Sit-Down Presentation', s.sitdown_score || 0, s.sitdown_score_explainer],
