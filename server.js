@@ -2516,9 +2516,32 @@ body::after{
 .logo .b{color:#00AEEF;text-shadow:0 0 24px rgba(0,174,239,.55);}
 .logo .w{color:#fff;}
 .logo .game{display:inline-block;margin-left:14px;padding:4px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border-radius:999px;font-size:11px;letter-spacing:.16em;text-shadow:none;font-weight:800;}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.practice-link{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(0,174,239,0.08);border:1px solid rgba(0,174,239,0.3);border-radius:999px;color:#22D3EE;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.04em;transition:all .15s;}
+.practice-link:hover{background:rgba(0,174,239,0.15);border-color:rgba(0,174,239,0.6);transform:translateY(-1px);}
 .player-pill{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:999px;font-size:12px;color:#9CA3AF;}
 .player-pill .xp{color:#00AEEF;font-weight:900;}
 .player-pill .name{color:#fff;font-weight:700;}
+
+/* Practice card on level map — opens /practice in a new tab, no game progress affected */
+.practice-card{
+  display:flex;align-items:center;gap:18px;
+  background:linear-gradient(135deg,rgba(0,174,239,0.08),rgba(124,58,237,0.06));
+  border:1px solid rgba(0,174,239,0.25);
+  border-radius:16px;
+  padding:20px 24px;margin-bottom:24px;
+  text-decoration:none;color:inherit;
+  transition:all .2s;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.practice-card:hover{border-color:rgba(0,174,239,0.55);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,174,239,0.15);}
+.practice-icon{font-size:32px;flex-shrink:0;line-height:1;}
+.practice-body{flex:1;min-width:0;}
+.practice-title{font-size:18px;font-weight:900;color:#fff;letter-spacing:-.01em;margin-bottom:6px;}
+.practice-arrow{display:inline-block;color:#22D3EE;transition:transform .2s;margin-left:4px;}
+.practice-card:hover .practice-arrow{transform:translateX(4px);}
+.practice-sub{font-size:13px;color:#9CA3AF;line-height:1.55;}
+.practice-sub b{color:#22D3EE;font-weight:700;}
 
 /* SPLASH SCREEN */
 .splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;}
@@ -2928,8 +2951,11 @@ body::after{
 
     <div class="header">
       <div class="logo"><span class="b">AIRA</span><span class="w">FITNESS</span><span class="game">CLOSING GAME</span></div>
-      <div id="player-pill" class="player-pill hidden">
-        <span class="name" id="pp-name">Player</span> · <span class="xp"><span id="pp-xp">0</span> XP</span>
+      <div class="header-right">
+        <a href="/practice" target="_blank" class="practice-link">💪 Practice Mode</a>
+        <div id="player-pill" class="player-pill hidden">
+          <span class="name" id="pp-name">Player</span> · <span class="xp"><span id="pp-xp">0</span> XP</span>
+        </div>
       </div>
     </div>
 
@@ -2960,6 +2986,14 @@ body::after{
       </div>
 
       <div id="daily-card" class="hidden"></div>
+
+      <a href="/practice" target="_blank" class="practice-card">
+        <div class="practice-icon">💪</div>
+        <div class="practice-body">
+          <div class="practice-title">Just want to practice? <span class="practice-arrow">→</span></div>
+          <div class="practice-sub">Open Practice Mode in a new tab. Run mock consults without affecting your game progress. Includes <b>Coached Mode</b> — real-time hints + suggested wording when you go off-script. Best for new reps still learning.</div>
+        </div>
+      </a>
 
       <div class="grading-card">
         <div class="grading-head">
