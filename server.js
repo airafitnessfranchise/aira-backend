@@ -911,7 +911,7 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="subhead"><div class="subhead-inner">
   <div class="eyebrow">Consult Recorder</div>
   <div class="title">Admin Dashboard</div>
-  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/admin/locations" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
+  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/admin/locations" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; <a href="/scoring" style="color:#00AEEF;font-weight:700;text-decoration:none;">How Scoring Works →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
 </div></div>
 <div class="wrap">
   ${rangeSelectorHtml(period.range, "/admin")}
@@ -2902,7 +2902,7 @@ body::after{
     <!-- SPLASH -->
     <div id="splash" class="splash">
       <h1>Become an Expert Closer</h1>
-      <p class="tag">Five levels. Eleven prospects. Every objection you'll hear on the floor — simulated, scored, and coached. Beat each level to unlock the next. <b>Let's see how good you really are.</b></p>
+      <p class="tag">Five levels. Eleven prospects. Every objection you'll hear on the floor — simulated, scored, and coached. Beat each level to unlock the next. <b>Let's see how good you really are.</b><br><br><a href="/scoring" target="_blank" style="color:#00AEEF;font-weight:700;text-decoration:none;font-size:13px;letter-spacing:.04em;">How scoring works →</a></p>
       <div class="start-card">
         <label><span>Your Email <span style="color:#EC4899;">*</span></span><input id="player-email" type="email" placeholder="you@airafitness.com" required autocomplete="email" /></label>
         <label><span>Your Name</span><input id="player-name" placeholder="e.g. Alex" maxlength="32" autocomplete="name" /></label>
@@ -3383,6 +3383,180 @@ if (PLAYER.email && cookiePlayerId){
 </body></html>`);
 });
 
+// ─────────── /scoring — public explainer for franchisees + VPs ───────────
+app.get("/scoring", (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><title>How You're Graded · Aira Fitness</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;line-height:1.5;}
+a{color:#0284C7;}
+.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
+.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
+.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
+.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:28px 28px;}
+.subhead-inner{max-width:880px;margin:0 auto;}
+.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px;}
+.title{font-size:32px;font-weight:900;color:#0A0A0A;letter-spacing:-.02em;line-height:1.15;}
+.subtitle{font-size:14px;color:#6B7280;margin-top:6px;line-height:1.6;max-width:640px;}
+.wrap{max-width:880px;margin:0 auto;padding:32px 24px 80px;}
+.intro{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:8px;padding:22px 26px;margin-bottom:32px;font-size:15px;color:#111827;line-height:1.7;}
+.intro b{color:#0A0A0A;}
+h2{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin:36px 0 14px;}
+h2:first-of-type{margin-top:0;}
+.cat{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:24px 28px;margin-bottom:16px;}
+.cat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:10px;}
+.cat-name{font-size:20px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
+.cat-pts{font-size:14px;font-weight:800;color:#00AEEF;}
+.cat p{margin-bottom:12px;color:#374151;font-size:14.5px;line-height:1.7;}
+.cat ul{padding-left:0;list-style:none;margin:10px 0 14px;}
+.cat li{padding:8px 0 8px 26px;position:relative;font-size:14px;color:#374151;line-height:1.6;}
+.cat li.good::before{content:"✓";position:absolute;left:0;top:8px;color:#00AEEF;font-weight:900;}
+.cat li.bad::before{content:"✗";position:absolute;left:0;top:8px;color:#DC2626;font-weight:900;}
+.cat li b{color:#0A0A0A;font-weight:700;}
+.cat .what-it-tests{font-size:11px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px;}
+.cat .example{background:#F9FAFB;border-left:3px solid #D1D5DB;padding:12px 16px;margin:14px 0 6px;border-radius:4px;font-size:13.5px;color:#374151;font-style:italic;line-height:1.65;}
+.cat .example b{font-style:normal;color:#0A0A0A;}
+.thresholds{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0;}
+.thresh{padding:18px 20px;border-radius:8px;border:1px solid #E5E7EB;}
+.thresh.t85{border-color:#00AEEF;background:rgba(0,174,239,0.04);}
+.thresh.t70{border-color:#0284C7;background:rgba(2,132,199,0.04);}
+.thresh.tlow{border-color:#DC2626;background:rgba(220,38,38,0.04);}
+.thresh-num{font-size:28px;font-weight:900;letter-spacing:-.02em;line-height:1;}
+.thresh.t85 .thresh-num{color:#00AEEF;}
+.thresh.t70 .thresh-num{color:#0284C7;}
+.thresh.tlow .thresh-num{color:#DC2626;}
+.thresh-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;margin-top:6px;color:#374151;}
+.thresh-desc{font-size:13px;color:#6B7280;margin-top:8px;line-height:1.55;}
+.callout{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #FBBF24;border-radius:8px;padding:20px 24px;margin:18px 0;font-size:14.5px;line-height:1.7;color:#111827;}
+.callout b{color:#0A0A0A;}
+.callout-head{font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px;}
+.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;font-weight:600;margin-bottom:18px;}
+.back:hover{color:#0A0A0A;}
+</style></head><body>
+
+<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
+<div class="subhead"><div class="subhead-inner">
+  <div class="eyebrow">The Rubric</div>
+  <div class="title">How You're Graded</div>
+  <div class="subtitle">Every consult — real or practice — is scored on the same four categories. Here's exactly what the model is looking for, what gets you full credit, and what costs you points.</div>
+</div></div>
+
+<div class="wrap">
+
+  <div class="intro">
+    <b>Total possible: 100 points.</b> Four categories, each worth 25 points. The score is a coaching tool, not a test — it tells you what to sharpen for the next consult, not whether you "passed." Closing the sale is the goal. The score helps you build the habits that close more sales, more often, on harder prospects.
+  </div>
+
+  <h2>The Four Categories</h2>
+
+  <div class="cat">
+    <div class="cat-head"><div class="cat-name">Sit-Down Presentation</div><div class="cat-pts">0–25 pts</div></div>
+    <div class="what-it-tests">What it tests</div>
+    <p>How you present pricing once the prospect is seated at the desk. The opening sentence sets the entire emotional tone of the close.</p>
+    <ul>
+      <li class="good"><b>The five components of the sit-down:</b> "month to month," "no contracts / cancel anytime," "first + last + enrollment fee," "like every other gym," and ending with <b>"Make sense?"</b></li>
+      <li class="good">All three tiers presented with a brief description of what each one includes</li>
+      <li class="good">Price sheet stays face-down until the sit-down completes</li>
+      <li class="good">You stay seated for the entire close (never close while standing)</li>
+      <li class="good">Use of the assumptive close: <b>"Which one would you like to get started with today?"</b></li>
+      <li class="bad">Naming a price before doing the sit-down — sends the prospect into price-defense mode</li>
+      <li class="bad">Skipping <b>"Make sense?"</b> — that micro-yes is what primes every downstream yes</li>
+    </ul>
+    <div class="example"><b>Full credit example:</b> "At our gym we are month to month — there are no contracts, you can cancel any time. You just pay your first month, last month, and a one-time enrollment fee like every other gym. Make sense?"</div>
+  </div>
+
+  <div class="cat">
+    <div class="cat-head"><div class="cat-name">Objection Handling</div><div class="cat-pts">0–25 pts</div></div>
+    <div class="what-it-tests">What it tests</div>
+    <p>How you respond when the prospect pushes back. The Aira approach uses a specific sequence — diagnose the real objection before offering any solution.</p>
+    <ul>
+      <li class="good"><b>The Deaf Ear Close on the FIRST objection</b> before any offer: "I totally understand. Did you like the gym? Does it have everything you need? Is it more about the upfront costs that's stopping you from joining today?"</li>
+      <li class="good">Isolating the real objection with a question, not an assumption</li>
+      <li class="good"><b>Coupon Drop only after cost is confirmed</b> — "Did you happen to get our coupon mailer? It discounted the enrollment 50%. Would that help?"</li>
+      <li class="good"><b>Payment-timing solution before the Google Review Drop</b> when the objection is timing-based ("I get paid Friday"). Post-dating the billing closes at full price — that's a better outcome than waiving the enrollment.</li>
+      <li class="good">Google Review Drop only as last resort, after both Coupon and payment-timing have been declined</li>
+      <li class="good">For a spouse / girlfriend / partner objection: Deaf Ear → "If your partner doesn't join, would you still be interested?" → free pass on your account for them</li>
+      <li class="bad">Leading with a discount before isolating cost — destroys leverage you didn't need to spend</li>
+      <li class="bad">Using the Google Review Drop too early — it's the most expensive lever, save it</li>
+      <li class="bad">Accepting "let me think about it" without re-closing</li>
+    </ul>
+    <div class="example"><b>What scores well:</b> A rep who hears "I gotta talk to my wife" → runs the Deaf Ear → finds out it's actually about cost → offers the Coupon Drop → closes at half-off enrollment. That's the full sequence, in order, executed cleanly.</div>
+  </div>
+
+  <div class="cat">
+    <div class="cat-head"><div class="cat-name">Language &amp; Psychology</div><div class="cat-pts">0–25 pts</div></div>
+    <div class="what-it-tests">What it tests</div>
+    <p>How you talk. The wording you choose creates the prospect's emotional state, and that state determines whether they buy. This category is ONLY about the language itself — not about which sales moves you ran.</p>
+    <ul>
+      <li class="good"><b>Strategic questions</b> — tie-downs ("Did you like the gym?"), engineered-yes questions ("Would that help you out?", "Is that fair?", "Would you like me to grab that for you?"), and "Make sense?" check-ins. These ARE the technique.</li>
+      <li class="good">Assumptive language throughout — "Which one would you like to get started with today" not "Do you want to join?"</li>
+      <li class="good">Calm and warm after objections — no caving, no defensiveness</li>
+      <li class="good">Tie-downs run when buying signals appeared</li>
+      <li class="bad"><b>True permission-seeking</b> — "Do you want to join?", "Are you ready?", "What do you think?" after pricing. These give the prospect an out where forward motion was the move.</li>
+      <li class="bad">Hedge phrases that re-introduce a decision point you already closed: "Do you have your ID <i>to get you started</i>?" instead of "Do you have your ID and I can create your profile."</li>
+    </ul>
+    <div class="callout">
+      <div class="callout-head">Important — what this category does NOT cover</div>
+      Missing the Coupon Drop is an Objection Handling miss, not a Language miss. Missing the referral collection is a Close Execution miss, not a Language miss. <b>One gap, one category.</b> If your wording was clean, this category scores high — even if you missed a post-close move.
+    </div>
+  </div>
+
+  <div class="cat">
+    <div class="cat-head"><div class="cat-name">Close Execution</div><div class="cat-pts">0–25 pts</div></div>
+    <div class="what-it-tests">What it tests</div>
+    <p>Everything from the moment the prospect picks a tier through the end of the visit. The close itself, ID collection, and the post-close moves that build the business.</p>
+    <ul>
+      <li class="good">Direct assumptive close attempted: "Which one would you like to get started with today?"</li>
+      <li class="good"><b>Assumed ID collection</b> as a STATEMENT of forward motion: "Awesome. Do you have your ID and I can create your profile."</li>
+      <li class="good">Re-closed after objections without skipping sequence</li>
+      <li class="good"><b>By The Way Close</b> at end of free pass visits</li>
+      <li class="good"><b>PIF (paid in full) offered after sign-up:</b> "If you pay for the full year today, I can give you 20% off and 2 months free. Which works better?"</li>
+      <li class="good"><b>Referrals collected at point of sale</b> (right after taking the ID): "Your first month only, you can bring 5 people for free. Do you have your phone? Write down whoever you'd like to give a free pass to." Then silence while they write.</li>
+      <li class="bad">Hedge phrases at ID collection: "Do you have your ID to get you started?" / "to set you up?" — those re-introduce a decision point</li>
+      <li class="bad">Letting the prospect leave the desk to "think about it" without running the re-close</li>
+      <li class="bad">Skipping PIF and referrals after a successful close — those are real dollars left on the table</li>
+    </ul>
+  </div>
+
+  <h2>What the Total Score Means</h2>
+  <div class="thresholds">
+    <div class="thresh t85">
+      <div class="thresh-num">85+</div>
+      <div class="thresh-label">Excellence</div>
+      <div class="thresh-desc">You've internalized the psychology. This is the bar for "expert closer." The coaching note will celebrate plainly and name maybe one refinement.</div>
+    </div>
+    <div class="thresh t70">
+      <div class="thresh-num">70–84</div>
+      <div class="thresh-label">Solid — Passing</div>
+      <div class="thresh-desc">The fundamentals are there. The coaching note will name 1–2 specific refinements. Anything 70+ is considered a passing consult.</div>
+    </div>
+    <div class="thresh tlow">
+      <div class="thresh-num">Below 70</div>
+      <div class="thresh-label">Needs Work</div>
+      <div class="thresh-desc">Structural moves are missing. Coaching call territory — the rep needs targeted training on whichever category scored lowest. Auto-flagged for review.</div>
+    </div>
+  </div>
+
+  <h2>How "Did You Close?" is Decided</h2>
+  <div class="cat">
+    <p><b>did_close = true</b> ONLY if a paid membership was actually sold during the consult — payment information collected, ID taken, agreements signed for a paid plan.</p>
+    <p style="color:#6B7280;font-size:14px;">Free pass sign-ups are NOT closes. "I'll come back" is NOT a close. "I'll text you" is NOT a close. The model is told to be honest about this — soft maybes don't count.</p>
+  </div>
+
+  <h2>The Philosophy Behind the Score</h2>
+  <div class="callout" style="border-left-color:#00AEEF;">
+    <div class="callout-head" style="color:#0284C7;">Read this if you read nothing else</div>
+    <p style="margin-bottom:10px;"><b>The script is a teaching scaffold, not the bar.</b> Most franchisees walk in with zero sales experience. The Aira script gives you a structure to develop habits inside of while you build psychology fluency of your own.</p>
+    <p><b>If you close off-script using your own creative move, that's a WIN.</b> The model will celebrate it and explain WHY your move worked at a psychological level — which driver you activated, what feeling you created. The exact wording is the vehicle. Understanding is the destination.</p>
+  </div>
+
+  <p style="margin-top:32px;text-align:center;color:#9CA3AF;font-size:13px;">
+    Want to see this in action? <a href="/practice" style="color:#0284C7;font-weight:700;">Try the Practice Bot</a> or <a href="/airafitnessclosinggame" style="color:#0284C7;font-weight:700;">play the Closing Game</a>.
+  </p>
+
+</div>
+</body></html>`);
+});
+
 app.get("/practice", (req, res) => {
   const locOptions = ALL_LOCATIONS.map(
     (l) => `<option value="${l.location_id}">${l.franchise_name}</option>`,
@@ -3478,7 +3652,7 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
   <div>
     <div class="eyebrow">Practice</div>
     <div class="title">Objection Bot</div>
-    <div class="subtitle">Run a mock consult against an AI prospect. Get scored at the end.</div>
+    <div class="subtitle">Run a mock consult against an AI prospect. Get scored at the end. &nbsp;·&nbsp; <a href="/scoring" target="_blank" style="color:#0284C7;font-weight:700;text-decoration:none;">How scoring works →</a></div>
   </div>
 </div></div>
 
