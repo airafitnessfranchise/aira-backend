@@ -880,31 +880,57 @@ OUTPUTS:
   - a one-sentence hint naming the SPECIFIC mistake (e.g. "You named a price before doing the sit-down — prospect is now in price-defense mode")
   - a single suggested alternative wording (the actual sentence they could have said in this moment)
 
-OUTPUT — return ONLY valid JSON, no markdown, no commentary:
-{
-  "on_track": true|false,
-  "note": "short positive note if on_track, otherwise one-sentence hint",
-  "suggestion": "if off_track, one alternative sentence the rep could try; otherwise empty string"
-}`;
+OUTPUT FORMAT — your entire response must be ONLY a single JSON object. No prose before or after. No markdown code fences. Start with { and end with }.
+
+Schema:
+{"on_track": true, "note": "Sit-down hit clean", "suggestion": ""}
+or
+{"on_track": false, "note": "You named a price before doing the sit-down — prospect is now in price-defense mode", "suggestion": "Try this first: 'At our gym we are month to month, no contracts, you can cancel anytime. You just pay your first month, last month, and a one-time enrollment fee like every other gym. Make sense?'"}
+
+Always return BOTH note and suggestion fields. Use empty string "" for suggestion when on_track is true.`;
 
 async function evaluateRepMove(messages) {
+  let raw = "";
   try {
+    // The conversation messages start with the prospect's opening (assistant role) which would
+    // make the message array start with `assistant`. Anthropic requires the FIRST message to be
+    // user. Wrap the whole conversation in one user-role message containing the transcript so
+    // the eval works regardless of who spoke first.
+    const transcript = messages
+      .map((m) => (m.role === "user" ? "REP: " : "PROSPECT: ") + m.content)
+      .join("\n\n");
+    const lastRep =
+      messages.filter((m) => m.role === "user").slice(-1)[0]?.content || "";
+    const userPrompt = `Here is the consultation transcript so far:\n\n${transcript}\n\nThe rep's MOST RECENT message was:\n"${lastRep}"\n\nEvaluate ONLY this most recent rep message. Return JSON only.`;
+
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 250,
+      max_tokens: 350,
       system: COACH_SYSTEM_PROMPT,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: [{ role: "user", content: userPrompt }],
     });
-    const raw = message.content[0].text.trim();
+    raw = message.content[0].text.trim();
     const cleaned = raw.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    // Find the first { and last } — handle any prose wrapping
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1) throw new Error("no JSON object found");
+    const parsed = JSON.parse(cleaned.slice(start, end + 1));
+    console.log(
+      `[Coach] on_track=${parsed.on_track} note="${(parsed.note || "").slice(0, 60)}"`,
+    );
     return {
       on_track: parsed.on_track === true,
       note: String(parsed.note || "").trim(),
       suggestion: String(parsed.suggestion || "").trim(),
     };
   } catch (err) {
-    console.error("[Coach] eval failed:", err.message);
+    console.error(
+      "[Coach] eval failed:",
+      err.message,
+      "| raw:",
+      raw.slice(0, 200),
+    );
     return { on_track: true, note: "", suggestion: "" }; // fail-open — never block the conversation
   }
 }
