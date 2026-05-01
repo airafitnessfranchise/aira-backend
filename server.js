@@ -3489,69 +3489,168 @@ if (PLAYER.email && cookiePlayerId){
 app.get("/scoring", (req, res) => {
   res.send(`<!DOCTYPE html><html><head><title>How You're Graded · Aira Fitness</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;line-height:1.5;}
-a{color:#0284C7;}
-.brand{background:#0A0A0A;padding:22px 28px;text-align:center;}
-.brand-mark{font-size:22px;font-weight:900;letter-spacing:.18em;line-height:1;}
-.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
-.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:28px 28px;}
-.subhead-inner{max-width:880px;margin:0 auto;}
-.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px;}
-.title{font-size:32px;font-weight:900;color:#0A0A0A;letter-spacing:-.02em;line-height:1.15;}
-.subtitle{font-size:14px;color:#6B7280;margin-top:6px;line-height:1.6;max-width:640px;}
-.wrap{max-width:880px;margin:0 auto;padding:32px 24px 80px;}
-.intro{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:8px;padding:22px 26px;margin-bottom:32px;font-size:15px;color:#111827;line-height:1.7;}
-.intro b{color:#0A0A0A;}
-h2{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin:36px 0 14px;}
-h2:first-of-type{margin-top:0;}
-.cat{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:24px 28px;margin-bottom:16px;}
-.cat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #F3F4F6;flex-wrap:wrap;gap:10px;}
-.cat-name{font-size:20px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
-.cat-pts{font-size:14px;font-weight:800;color:#00AEEF;}
-.cat p{margin-bottom:12px;color:#374151;font-size:14.5px;line-height:1.7;}
-.cat ul{padding-left:0;list-style:none;margin:10px 0 14px;}
-.cat li{padding:8px 0 8px 26px;position:relative;font-size:14px;color:#374151;line-height:1.6;}
-.cat li.good::before{content:"✓";position:absolute;left:0;top:8px;color:#00AEEF;font-weight:900;}
-.cat li.bad::before{content:"✗";position:absolute;left:0;top:8px;color:#DC2626;font-weight:900;}
-.cat li b{color:#0A0A0A;font-weight:700;}
-.cat .what-it-tests{font-size:11px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px;}
-.cat .example{background:#F9FAFB;border-left:3px solid #D1D5DB;padding:12px 16px;margin:14px 0 6px;border-radius:4px;font-size:13.5px;color:#374151;font-style:italic;line-height:1.65;}
-.cat .example b{font-style:normal;color:#0A0A0A;}
-.thresholds{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0;}
-.thresh{padding:18px 20px;border-radius:8px;border:1px solid #E5E7EB;}
-.thresh.t85{border-color:#00AEEF;background:rgba(0,174,239,0.04);}
-.thresh.t70{border-color:#0284C7;background:rgba(2,132,199,0.04);}
-.thresh.tlow{border-color:#DC2626;background:rgba(220,38,38,0.04);}
-.thresh-num{font-size:28px;font-weight:900;letter-spacing:-.02em;line-height:1;}
-.thresh.t85 .thresh-num{color:#00AEEF;}
+html,body{min-height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;
+  background:#05080F;color:#E5E7EB;-webkit-font-smoothing:antialiased;
+  position:relative;min-height:100vh;overflow-x:hidden;line-height:1.55;
+}
+body::before{
+  content:'';position:fixed;inset:-50%;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(0,174,239,0.18), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 30%, rgba(124,58,237,0.14), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(236,72,153,0.10), transparent 60%);
+  filter:blur(40px);z-index:0;animation:auroraShift 22s ease-in-out infinite alternate;
+}
+@keyframes auroraShift{0%{transform:translate(0,0) rotate(0);}100%{transform:translate(-3%,3%) rotate(2deg);}}
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.6;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 47% 73%, rgba(0,174,239,0.5), transparent),
+    radial-gradient(1px 1px at 82% 27%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 33% 88%, rgba(124,58,237,0.4), transparent),
+    radial-gradient(2px 2px at 15% 65%, rgba(0,174,239,0.55), transparent);
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+
+.app{position:relative;z-index:1;min-height:100vh;padding:24px;}
+.shell{max-width:920px;margin:0 auto;}
+
+/* HEADER */
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:36px;flex-wrap:wrap;gap:12px;}
+.logo{font-size:18px;font-weight:900;letter-spacing:.2em;}
+.logo .b{color:#00AEEF;text-shadow:0 0 24px rgba(0,174,239,.55);}
+.logo .w{color:#fff;}
+.logo .badge{display:inline-block;margin-left:14px;padding:4px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border-radius:999px;font-size:11px;letter-spacing:.16em;text-shadow:none;font-weight:800;}
+.header-right{display:flex;gap:8px;flex-wrap:wrap;}
+.header-link{display:inline-flex;align-items:center;padding:7px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#9CA3AF;border-radius:999px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.04em;transition:all .15s;}
+.header-link:hover{border-color:rgba(0,174,239,0.4);color:#22D3EE;}
+.header-link.cta{background:rgba(0,174,239,0.08);border-color:rgba(0,174,239,0.3);color:#22D3EE;}
+
+/* HERO */
+.hero{text-align:center;padding:20px 0 48px;animation:slideUp .8s ease-out;}
+.hero .eyebrow{font-size:11px;font-weight:900;color:#22D3EE;letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px;}
+.hero h1{
+  font-size:clamp(38px,6vw,68px);font-weight:900;line-height:1;letter-spacing:-.02em;
+  background:linear-gradient(120deg,#00AEEF 0%,#7C3AED 50%,#EC4899 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  margin-bottom:18px;filter:drop-shadow(0 4px 24px rgba(0,174,239,.3));
+}
+.hero .lede{font-size:16px;color:#9CA3AF;max-width:600px;margin:0 auto;line-height:1.65;}
+.hero .lede b{color:#fff;font-weight:600;}
+
+/* INTRO CARD */
+.card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:24px 28px;margin-bottom:18px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  animation:fadeIn .8s ease-out;
+}
+.intro{border-left:4px solid #00AEEF;font-size:15px;color:#E5E7EB;line-height:1.7;}
+.intro b{color:#fff;}
+
+h2.section{font-size:28px;font-weight:900;color:#fff;letter-spacing:-.02em;margin:40px 0 16px;}
+h2.section .accent{
+  background:linear-gradient(120deg,#22D3EE,#7C3AED);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+
+/* CATEGORY CARDS */
+.cat{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:26px 28px;margin-bottom:14px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  position:relative;overflow:hidden;
+}
+.cat::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--cat-color,#00AEEF),transparent);
+}
+.cat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:8px;}
+.cat-name{font-size:22px;font-weight:900;color:#fff;letter-spacing:-.01em;}
+.cat-pts{font-size:12px;font-weight:800;color:var(--cat-color,#00AEEF);letter-spacing:.06em;text-transform:uppercase;}
+.cat p{margin-bottom:14px;color:#9CA3AF;font-size:14.5px;line-height:1.7;}
+.cat .what-it-tests{font-size:10px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.16em;margin-bottom:6px;}
+.cat ul{padding-left:0;list-style:none;margin:14px 0;}
+.cat li{padding:9px 0 9px 28px;position:relative;font-size:14px;color:#D1D5DB;line-height:1.6;}
+.cat li.good::before{content:"✓";position:absolute;left:0;top:9px;color:#22D3EE;font-weight:900;font-size:14px;}
+.cat li.bad::before{content:"✗";position:absolute;left:0;top:9px;color:#EC4899;font-weight:900;font-size:14px;}
+.cat li b{color:#fff;font-weight:700;}
+.cat .example{
+  background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-left:3px solid var(--cat-color,#00AEEF);
+  padding:14px 18px;margin:14px 0 6px;border-radius:8px;
+  font-size:13.5px;color:#D1D5DB;font-style:italic;line-height:1.65;
+}
+.cat .example b{color:var(--cat-color,#00AEEF);font-style:normal;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:6px;}
+
+/* THRESHOLDS */
+.thresholds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0;}
+.thresh{
+  padding:22px 22px;border-radius:14px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  position:relative;overflow:hidden;
+}
+.thresh.t85{border-color:rgba(34,211,238,0.4);box-shadow:0 0 0 1px rgba(34,211,238,0.15),0 8px 24px rgba(34,211,238,0.08);}
+.thresh.t70{border-color:rgba(2,132,199,0.4);}
+.thresh.tlow{border-color:rgba(236,72,153,0.4);}
+.thresh-num{font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:1;}
+.thresh.t85 .thresh-num{background:linear-gradient(120deg,#22D3EE,#00AEEF);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 24px rgba(34,211,238,.4);}
 .thresh.t70 .thresh-num{color:#0284C7;}
-.thresh.tlow .thresh-num{color:#DC2626;}
-.thresh-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;margin-top:6px;color:#374151;}
-.thresh-desc{font-size:13px;color:#6B7280;margin-top:8px;line-height:1.55;}
-.callout{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #FBBF24;border-radius:8px;padding:20px 24px;margin:18px 0;font-size:14.5px;line-height:1.7;color:#111827;}
-.callout b{color:#0A0A0A;}
-.callout-head{font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.14em;margin-bottom:8px;}
-.back{display:inline-block;color:#6B7280;font-size:12px;text-decoration:none;font-weight:600;margin-bottom:18px;}
-.back:hover{color:#0A0A0A;}
+.thresh.tlow .thresh-num{color:#EC4899;}
+.thresh-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;margin-top:8px;color:#fff;}
+.thresh-desc{font-size:13px;color:#9CA3AF;margin-top:8px;line-height:1.55;}
+
+/* CALLOUT */
+.callout{
+  background:linear-gradient(135deg,rgba(0,174,239,0.06),rgba(124,58,237,0.06));
+  border:1px solid rgba(0,174,239,0.25);border-left:4px solid #00AEEF;
+  border-radius:14px;padding:22px 26px;margin:18px 0;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.callout-head{font-size:11px;font-weight:800;color:#22D3EE;text-transform:uppercase;letter-spacing:.14em;margin-bottom:10px;}
+.callout p{font-size:14.5px;color:#D1D5DB;line-height:1.7;}
+.callout p + p{margin-top:10px;}
+.callout b{color:#fff;}
+.cat .callout{margin:18px 0 4px;border-left-color:#FBBF24;background:rgba(251,191,36,0.04);border-color:rgba(251,191,36,0.25);}
+.cat .callout-head{color:#FBBF24;}
+
+.cat .closing-def{margin-top:6px;}
+.cat .closing-def b{color:#fff;}
+.cat .closing-def-sub{color:#9CA3AF;font-size:13.5px;margin-top:8px;}
+
+.outro{text-align:center;color:#9CA3AF;font-size:13px;margin-top:36px;padding:20px 0;}
+.outro a{color:#22D3EE;font-weight:700;text-decoration:none;}
+.outro a:hover{color:#00AEEF;}
 </style></head><body>
 
-<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
-<div class="subhead"><div class="subhead-inner">
-  <div class="eyebrow">The Rubric</div>
-  <div class="title">How You're Graded</div>
-  <div class="subtitle">Every consult — real or practice — is scored on the same four categories. Here's exactly what the model is looking for, what gets you full credit, and what costs you points.</div>
-</div></div>
+<div class="app"><div class="shell">
 
-<div class="wrap">
-
-  <div class="intro">
-    <b>Total possible: 100 points.</b> Four categories, each worth 25 points. The score is a coaching tool, not a test — it tells you what to sharpen for the next consult, not whether you "passed." Closing the sale is the goal. The score helps you build the habits that close more sales, more often, on harder prospects.
+  <div class="header">
+    <div class="logo"><span class="b">AIRA</span><span class="w">FITNESS</span><span class="badge">THE RUBRIC</span></div>
+    <div class="header-right">
+      <a href="/practice" target="_blank" class="header-link cta">💪 Practice Bot</a>
+      <a href="/airafitnessclosinggame" target="_blank" class="header-link cta">🎮 Closing Game</a>
+    </div>
   </div>
 
-  <h2>The Four Categories</h2>
+  <div class="hero">
+    <div class="eyebrow">How You're Graded</div>
+    <h1>Every Word Scored.</h1>
+    <p class="lede">Real consults and practice runs use the <b>same scoring brain</b>. Here's exactly what we look for, what gets full marks, and what costs you points.</p>
+  </div>
 
-  <div class="cat">
-    <div class="cat-head"><div class="cat-name">Sit-Down Presentation</div><div class="cat-pts">0–25 pts</div></div>
+  <div class="card intro">
+    <b>Total possible: 100 points.</b> Four categories, each worth 25 points. The score is a coaching tool, not a test — it tells you what to sharpen for the next consult, not whether you "passed." <b>Closing the sale is the goal.</b> The score helps you build the habits that close more sales, more often, on harder prospects.
+  </div>
+
+  <h2 class="section">The Four <span class="accent">Categories</span></h2>
+
+  <div class="cat" style="--cat-color:#22D3EE;">
+    <div class="cat-head"><div class="cat-name">Sit-Down Presentation</div><div class="cat-pts">25 pts</div></div>
     <div class="what-it-tests">What it tests</div>
     <p>How you present pricing once the prospect is seated at the desk. The opening sentence sets the entire emotional tone of the close.</p>
     <ul>
@@ -3563,11 +3662,11 @@ h2:first-of-type{margin-top:0;}
       <li class="bad">Naming a price before doing the sit-down — sends the prospect into price-defense mode</li>
       <li class="bad">Skipping <b>"Make sense?"</b> — that micro-yes is what primes every downstream yes</li>
     </ul>
-    <div class="example"><b>Full credit example:</b> "At our gym we are month to month — there are no contracts, you can cancel any time. You just pay your first month, last month, and a one-time enrollment fee like every other gym. Make sense?"</div>
+    <div class="example"><b>Full credit example</b>"At our gym we are month to month — there are no contracts, you can cancel any time. You just pay your first month, last month, and a one-time enrollment fee like every other gym. Make sense?"</div>
   </div>
 
-  <div class="cat">
-    <div class="cat-head"><div class="cat-name">Objection Handling</div><div class="cat-pts">0–25 pts</div></div>
+  <div class="cat" style="--cat-color:#0284C7;">
+    <div class="cat-head"><div class="cat-name">Objection Handling</div><div class="cat-pts">25 pts</div></div>
     <div class="what-it-tests">What it tests</div>
     <p>How you respond when the prospect pushes back. The Aira approach uses a specific sequence — diagnose the real objection before offering any solution.</p>
     <ul>
@@ -3581,11 +3680,11 @@ h2:first-of-type{margin-top:0;}
       <li class="bad">Using the Google Review Drop too early — it's the most expensive lever, save it</li>
       <li class="bad">Accepting "let me think about it" without re-closing</li>
     </ul>
-    <div class="example"><b>What scores well:</b> A rep who hears "I gotta talk to my wife" → runs the Deaf Ear → finds out it's actually about cost → offers the Coupon Drop → closes at half-off enrollment. That's the full sequence, in order, executed cleanly.</div>
+    <div class="example"><b>What scores well</b>A rep who hears "I gotta talk to my wife" → runs the Deaf Ear → finds out it's actually about cost → offers the Coupon Drop → closes at half-off enrollment. That's the full sequence, in order, executed cleanly.</div>
   </div>
 
-  <div class="cat">
-    <div class="cat-head"><div class="cat-name">Language &amp; Psychology</div><div class="cat-pts">0–25 pts</div></div>
+  <div class="cat" style="--cat-color:#7C3AED;">
+    <div class="cat-head"><div class="cat-name">Language &amp; Psychology</div><div class="cat-pts">25 pts</div></div>
     <div class="what-it-tests">What it tests</div>
     <p>How you talk. The wording you choose creates the prospect's emotional state, and that state determines whether they buy. This category is ONLY about the language itself — not about which sales moves you ran.</p>
     <ul>
@@ -3598,12 +3697,12 @@ h2:first-of-type{margin-top:0;}
     </ul>
     <div class="callout">
       <div class="callout-head">Important — what this category does NOT cover</div>
-      Missing the Coupon Drop is an Objection Handling miss, not a Language miss. Missing the referral collection is a Close Execution miss, not a Language miss. <b>One gap, one category.</b> If your wording was clean, this category scores high — even if you missed a post-close move.
+      <p>Missing the Coupon Drop is an Objection Handling miss, not a Language miss. Missing the referral collection is a Close Execution miss, not a Language miss. <b>One gap, one category.</b> If your wording was clean, this category scores high — even if you missed a post-close move.</p>
     </div>
   </div>
 
-  <div class="cat">
-    <div class="cat-head"><div class="cat-name">Close Execution</div><div class="cat-pts">0–25 pts</div></div>
+  <div class="cat" style="--cat-color:#EC4899;">
+    <div class="cat-head"><div class="cat-name">Close Execution</div><div class="cat-pts">25 pts</div></div>
     <div class="what-it-tests">What it tests</div>
     <p>Everything from the moment the prospect picks a tier through the end of the visit. The close itself, ID collection, and the post-close moves that build the business.</p>
     <ul>
@@ -3619,7 +3718,7 @@ h2:first-of-type{margin-top:0;}
     </ul>
   </div>
 
-  <h2>What the Total Score Means</h2>
+  <h2 class="section">What the <span class="accent">Total Score</span> Means</h2>
   <div class="thresholds">
     <div class="thresh t85">
       <div class="thresh-num">85+</div>
@@ -3628,34 +3727,34 @@ h2:first-of-type{margin-top:0;}
     </div>
     <div class="thresh t70">
       <div class="thresh-num">70–84</div>
-      <div class="thresh-label">Solid — Passing</div>
+      <div class="thresh-label">Solid · Passing</div>
       <div class="thresh-desc">The fundamentals are there. The coaching note will name 1–2 specific refinements. Anything 70+ is considered a passing consult.</div>
     </div>
     <div class="thresh tlow">
-      <div class="thresh-num">Below 70</div>
+      <div class="thresh-num">&lt;70</div>
       <div class="thresh-label">Needs Work</div>
       <div class="thresh-desc">Structural moves are missing. Coaching call territory — the rep needs targeted training on whichever category scored lowest. Auto-flagged for review.</div>
     </div>
   </div>
 
-  <h2>How "Did You Close?" is Decided</h2>
-  <div class="cat">
-    <p><b>did_close = true</b> ONLY if a paid membership was actually sold during the consult — payment information collected, ID taken, agreements signed for a paid plan.</p>
-    <p style="color:#6B7280;font-size:14px;">Free pass sign-ups are NOT closes. "I'll come back" is NOT a close. "I'll text you" is NOT a close. The model is told to be honest about this — soft maybes don't count.</p>
+  <h2 class="section">How "Did You <span class="accent">Close?</span>" Is Decided</h2>
+  <div class="cat" style="--cat-color:#22D3EE;">
+    <div class="closing-def"><b>did_close = true</b> ONLY if a paid membership was actually sold during the consult — payment information collected, ID taken, agreements signed for a paid plan.</div>
+    <div class="closing-def-sub">Free pass sign-ups are NOT closes. "I'll come back" is NOT a close. "I'll text you" is NOT a close. The model is told to be honest about this — soft maybes don't count.</div>
   </div>
 
-  <h2>The Philosophy Behind the Score</h2>
-  <div class="callout" style="border-left-color:#00AEEF;">
-    <div class="callout-head" style="color:#0284C7;">Read this if you read nothing else</div>
-    <p style="margin-bottom:10px;"><b>The script is a teaching scaffold, not the bar.</b> Most franchisees walk in with zero sales experience. The Aira script gives you a structure to develop habits inside of while you build psychology fluency of your own.</p>
+  <h2 class="section">The <span class="accent">Philosophy</span> Behind the Score</h2>
+  <div class="callout">
+    <div class="callout-head">Read this if you read nothing else</div>
+    <p><b>The script is a teaching scaffold, not the bar.</b> Most franchisees walk in with zero sales experience. The Aira script gives you a structure to develop habits inside of while you build psychology fluency of your own.</p>
     <p><b>If you close off-script using your own creative move, that's a WIN.</b> The model will celebrate it and explain WHY your move worked at a psychological level — which driver you activated, what feeling you created. The exact wording is the vehicle. Understanding is the destination.</p>
   </div>
 
-  <p style="margin-top:32px;text-align:center;color:#9CA3AF;font-size:13px;">
-    Want to see this in action? <a href="/practice" style="color:#0284C7;font-weight:700;">Try the Practice Bot</a> or <a href="/airafitnessclosinggame" style="color:#0284C7;font-weight:700;">play the Closing Game</a>.
-  </p>
+  <div class="outro">
+    Want to see this in action? <a href="/practice" target="_blank">Try the Practice Bot</a> &nbsp;or&nbsp; <a href="/airafitnessclosinggame" target="_blank">Play the Closing Game</a>
+  </div>
 
-</div>
+</div></div>
 </body></html>`);
 });
 
