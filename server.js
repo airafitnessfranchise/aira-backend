@@ -3346,7 +3346,7 @@ function sceneSet(name){
   div.innerHTML =
     '<div class="scene-eyebrow">📍 Scene</div>' +
     '<div class="scene-title">You just finished the tour.</div>' +
-    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the sit-down</b> — month-to-month, no contracts, first + last + enrollment fee, like every other gym, ending with <b>"Make sense?"</b> Then present the three tiers and assumptive close.</div>';
+    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the price presentation and go over the programs offered.</b></div>';
   $('messages').appendChild(div);
   $('messages').scrollTop = $('messages').scrollHeight;
 }
@@ -4110,7 +4110,7 @@ function sceneSet(name) {
   div.innerHTML =
     '<div class="scene-eyebrow">📍 Scene</div>' +
     '<div class="scene-title">You just finished the tour.</div>' +
-    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the sit-down</b> — month-to-month, no contracts, first + last + enrollment fee, like every other gym, ending with <b>"Make sense?"</b> Then present the three tiers and assumptive close.</div>';
+    '<div class="scene-body">' + name + ' is sitting at your desk waiting to hear about pricing. Your next move: <b>start the price presentation and go over the programs offered.</b></div>';
   $('messages').appendChild(div);
   $('messages').scrollTop = $('messages').scrollHeight;
 }
