@@ -2612,6 +2612,36 @@ body::after{
 .daily-done{display:inline-block;padding:8px 18px;background:rgba(34,211,238,0.15);color:#22D3EE;border:1px solid rgba(34,211,238,0.3);border-radius:9999px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;position:relative;}
 .daily-btn{position:relative;display:inline-block;width:auto;padding:12px 24px;}
 
+/* Grading explainer card */
+.grading-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:24px 26px;
+  margin-bottom:28px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.grading-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;flex-wrap:wrap;gap:12px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.06);}
+.grading-eyebrow{font-size:11px;font-weight:900;letter-spacing:.18em;color:#00AEEF;text-transform:uppercase;}
+.grading-sub{font-size:13px;color:#9CA3AF;margin-top:4px;line-height:1.5;}
+.grading-deep{font-size:12px;font-weight:700;color:#00AEEF;text-decoration:none;letter-spacing:.04em;flex-shrink:0;padding:6px 12px;border:1px solid rgba(0,174,239,0.3);border-radius:9999px;transition:all .15s;}
+.grading-deep:hover{background:rgba(0,174,239,0.08);border-color:rgba(0,174,239,0.6);}
+.grading-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
+.grading-cat{padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;}
+.grading-cat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px;}
+.grading-cat-name{font-size:13px;font-weight:800;color:#fff;letter-spacing:-.005em;}
+.grading-cat-pts{font-size:11px;font-weight:800;color:#00AEEF;letter-spacing:.04em;flex-shrink:0;}
+.grading-cat-desc{font-size:12.5px;color:#9CA3AF;line-height:1.55;}
+.grading-thresh{display:flex;flex-direction:column;gap:8px;padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:14px;}
+.grading-thresh-row{display:flex;align-items:center;gap:14px;}
+.grading-thresh-num{font-size:14px;font-weight:900;letter-spacing:-.02em;width:62px;flex-shrink:0;}
+.grading-thresh-num.t-good{color:#22D3EE;}
+.grading-thresh-num.t-mid{color:#0284C7;}
+.grading-thresh-num.t-low{color:#EC4899;}
+.grading-thresh-text{font-size:13px;color:#D1D5DB;}
+.grading-foot{font-size:13px;color:#9CA3AF;text-align:center;padding:12px 0 2px;line-height:1.55;}
+.grading-foot b{color:#fff;font-weight:800;}
+
 /* Achievements grid */
 .achievement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:8px;}
 .ach{
@@ -2926,6 +2956,40 @@ body::after{
       </div>
 
       <div id="daily-card" class="hidden"></div>
+
+      <div class="grading-card">
+        <div class="grading-head">
+          <div>
+            <div class="grading-eyebrow">How You're Graded</div>
+            <div class="grading-sub">100 points total — every consult is scored on these four categories</div>
+          </div>
+          <a href="/scoring" target="_blank" class="grading-deep">Full breakdown →</a>
+        </div>
+        <div class="grading-grid">
+          <div class="grading-cat">
+            <div class="grading-cat-head"><span class="grading-cat-name">Sit-Down Presentation</span><span class="grading-cat-pts">25 pts</span></div>
+            <div class="grading-cat-desc">Did you nail the opening — month-to-month, no contracts, first + last + enrollment, "like every other gym," ending with "Make sense?" All three tiers presented. Stay seated.</div>
+          </div>
+          <div class="grading-cat">
+            <div class="grading-cat-head"><span class="grading-cat-name">Objection Handling</span><span class="grading-cat-pts">25 pts</span></div>
+            <div class="grading-cat-desc">Did you run the Deaf Ear Close on the first objection before offering anything? Did you isolate cost before pulling out the Coupon Drop? Payment-timing before the Google Review Drop?</div>
+          </div>
+          <div class="grading-cat">
+            <div class="grading-cat-head"><span class="grading-cat-name">Language &amp; Psychology</span><span class="grading-cat-pts">25 pts</span></div>
+            <div class="grading-cat-desc">Did you use assumptive language ("Which one would you like to get started with today?") and strategic questions whose answer was already a yes? No true permission-seeking, no hedge phrases.</div>
+          </div>
+          <div class="grading-cat">
+            <div class="grading-cat-head"><span class="grading-cat-name">Close Execution</span><span class="grading-cat-pts">25 pts</span></div>
+            <div class="grading-cat-desc">Assumptive close, immediate ID collection without a hedge, and the post-close moves that build the business — PIF offer + referral collection.</div>
+          </div>
+        </div>
+        <div class="grading-thresh">
+          <div class="grading-thresh-row"><span class="grading-thresh-num t-good">85+</span><span class="grading-thresh-text">Excellence — you've internalized the psychology</span></div>
+          <div class="grading-thresh-row"><span class="grading-thresh-num t-mid">70–84</span><span class="grading-thresh-text">Solid — passing. Coaching note will name 1–2 refinements</span></div>
+          <div class="grading-thresh-row"><span class="grading-thresh-num t-low">&lt;70</span><span class="grading-thresh-text">Needs work — structural moves missing. Auto-flagged for review</span></div>
+        </div>
+        <div class="grading-foot">To clear a scenario in this game: <b>close the sale AND score 70+.</b></div>
+      </div>
 
       <div class="level-grid" id="level-grid"></div>
 
