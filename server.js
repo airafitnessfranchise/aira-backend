@@ -2057,6 +2057,8 @@ app.post("/practice/start", async (req, res) => {
     const player_id = req.body.player_id || null;
     const player_name = req.body.player_name || null;
     const forced_scenario_id = req.body.scenario_id || null;
+    const coach_mode =
+      req.body.coach_mode === true || req.body.coach_mode === "1";
     const out = startPracticeSession({
       difficulty,
       location_id,
@@ -2065,6 +2067,7 @@ app.post("/practice/start", async (req, res) => {
       player_id,
       player_name,
       forced_scenario_id,
+      coach_mode,
     });
     res.json({ ok: true, ...out });
   } catch (err) {
@@ -2080,8 +2083,9 @@ app.post("/practice/turn", async (req, res) => {
       return res
         .status(400)
         .json({ ok: false, error: "session_id and message required" });
-    const reply = await chatAsProspect(session_id, message);
-    res.json({ ok: true, reply });
+    const result = await chatAsProspect(session_id, message);
+    // Backwards-compatible — game/practice clients reading r.reply still work, coach is optional
+    res.json({ ok: true, reply: result.reply, coach: result.coach || null });
   } catch (err) {
     console.error("[Practice] turn error:", err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -3675,6 +3679,22 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
 .bubble.rep{background:#0A0A0A;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
 .bubble.thinking{background:#fff;border:1px solid #E5E7EB;color:#9CA3AF;align-self:flex-start;font-style:italic;border-bottom-left-radius:4px;}
 
+/* Coach hint bubbles — render between rep and prospect bubbles in coach mode */
+.coach-bubble{align-self:stretch;max-width:100%;background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #F59E0B;border-radius:10px;padding:12px 14px;margin:2px 0;animation:fadeIn .25s ease-out;}
+.coach-bubble.on{background:#ECFDF5;border-color:#86EFAC;border-left-color:#22C55E;}
+.coach-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.coach-icon{font-size:14px;}
+.coach-label{font-size:10px;font-weight:800;color:#92400E;letter-spacing:.14em;text-transform:uppercase;}
+.coach-bubble.on .coach-label{color:#15803D;}
+.coach-note{font-size:13.5px;color:#3A2410;line-height:1.5;font-weight:500;}
+.coach-bubble.on .coach-note{color:#0A2410;}
+.coach-suggest{background:#fff;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-top:10px;}
+.coach-suggest-label{font-size:9px;font-weight:800;color:#92400E;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;}
+.coach-suggest-text{font-size:13.5px;color:#0A0A0A;line-height:1.55;font-style:italic;margin-bottom:8px;}
+.coach-use{padding:5px 10px;background:#0A0A0A;color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:inherit;}
+.coach-use:hover{background:#1F2937;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
+
 .chat-input{padding:14px;border-top:1px solid #F3F4F6;display:flex;gap:10px;flex-shrink:0;background:#fff;}
 .chat-input textarea{flex:1;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;font-family:inherit;resize:none;min-height:42px;max-height:140px;line-height:1.4;}
 .chat-input textarea:focus{outline:none;border-color:#00AEEF;}
@@ -3736,6 +3756,13 @@ button.cta:disabled{opacity:.5;cursor:not-allowed;}
         ${locOptions}
       </select>
     </label>
+    <label class="fld coach-toggle" style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:#F0FBFF;border:1px solid #BAE6FD;border-radius:8px;cursor:pointer;">
+      <input id="coach-mode" type="checkbox" style="margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px;accent-color:#0284C7;" />
+      <span style="display:block;letter-spacing:0;text-transform:none;color:#0A0A0A;font-weight:500;font-size:13px;line-height:1.5;margin-bottom:0;">
+        <b style="font-weight:800;display:block;margin-bottom:2px;letter-spacing:0;text-transform:none;color:#0284C7;">💡 Coached Mode <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#00AEEF;color:#fff;padding:2px 6px;border-radius:9999px;margin-left:4px;">NEW</span></b>
+        Get real-time hints when you go off-script. After each thing you type, we'll tell you if it was the right move and suggest better wording when it wasn't. Best for new reps still learning the script.
+      </span>
+    </label>
     <button class="cta" id="start-btn">Start Consult →</button>
   </div>
 
@@ -3783,17 +3810,21 @@ async function postJson(url, body) {
   return r.json();
 }
 
+let COACH_MODE = false;
+
 $('start-btn').onclick = async () => {
   const difficulty = $('difficulty').value;
   const location_id = $('location').value;
+  const coach_mode = $('coach-mode').checked;
   if (!location_id) { alert('Please select your gym'); return; }
   $('start-btn').disabled = true;
   $('start-btn').textContent = 'Starting…';
-  const r = await postJson('/practice/start', { difficulty, location_id });
+  const r = await postJson('/practice/start', { difficulty, location_id, coach_mode });
   if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
   SESSION_ID = r.session_id;
   SCENARIO_ID = r.scenario_id || '';
-  $('persona-label').textContent = r.persona_label + (r.persona_name ? ' — ' + r.persona_name : '');
+  COACH_MODE = !!r.coach_mode;
+  $('persona-label').textContent = r.persona_label + (r.persona_name ? ' — ' + r.persona_name : '') + (COACH_MODE ? ' · 💡 COACHED MODE' : '');
   $('start').classList.add('hidden');
   $('chat').classList.remove('hidden');
   bubble('prospect', r.opening);
@@ -3809,6 +3840,30 @@ repInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send-btn').click(); }
 });
 
+function coachBubble(coach) {
+  if (!coach) return;
+  const div = document.createElement('div');
+  div.className = 'coach-bubble ' + (coach.on_track ? 'on' : 'off');
+  const icon = coach.on_track ? '✓' : '💡';
+  const label = coach.on_track ? 'COACH' : 'COACH · TRY THIS';
+  let html = '<div class="coach-head"><span class="coach-icon">' + icon + '</span> <span class="coach-label">' + label + '</span></div>';
+  if (coach.note) html += '<div class="coach-note">' + coach.note.replace(/</g,'&lt;') + '</div>';
+  if (coach.suggestion && !coach.on_track) {
+    const safe = coach.suggestion.replace(/</g,'&lt;').replace(/'/g,'&#39;');
+    html += '<div class="coach-suggest"><div class="coach-suggest-label">SAY SOMETHING LIKE:</div><div class="coach-suggest-text">"' + safe + '"</div><button class="coach-use" onclick="useSuggestion(this.dataset.text)" data-text="' + safe + '">Use this →</button></div>';
+  }
+  div.innerHTML = html;
+  $('messages').appendChild(div);
+  $('messages').scrollTop = $('messages').scrollHeight;
+}
+
+function useSuggestion(text) {
+  repInput.value = text.replace(/&#39;/g, "'");
+  repInput.focus();
+  repInput.style.height = 'auto';
+  repInput.style.height = Math.min(repInput.scrollHeight, 140) + 'px';
+}
+
 $('send-btn').onclick = async () => {
   const msg = repInput.value.trim();
   if (!msg) return;
@@ -3821,6 +3876,7 @@ $('send-btn').onclick = async () => {
   thinking.remove();
   $('send-btn').disabled = false;
   if (!r.ok) { bubble('prospect', '[error: ' + r.error + ']'); return; }
+  if (COACH_MODE && r.coach) coachBubble(r.coach);
   bubble('prospect', r.reply);
   repInput.focus();
 };

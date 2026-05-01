@@ -779,6 +779,7 @@ function startPracticeSession({
   player_id,
   player_name,
   forced_scenario_id,
+  coach_mode,
 }) {
   const bucket = PROSPECT_PERSONAS[difficulty] || PROSPECT_PERSONAS.medium;
   let scenario;
@@ -806,6 +807,7 @@ function startPracticeSession({
     scenario,
     location_id: location_id || null,
     mode: mode || "practice",
+    coach_mode: !!coach_mode,
     player_id: player_id || null,
     player_name: player_name || null,
     messages: [{ role: "assistant", content: scenario.opening }],
@@ -818,7 +820,74 @@ function startPracticeSession({
     persona_label: bucket.label,
     persona_name: scenario.name,
     scenario_id: scenario.id,
+    coach_mode: !!coach_mode,
   };
+}
+
+// ─────────── COACH MODE ───────────
+// Real-time coaching layer that runs alongside the prospect chat. For each rep
+// message, the coach LLM evaluates whether the move was on-script for where the
+// consult is right now. If off-track, returns a one-sentence hint + a suggested
+// alternative wording. Prospect response and coach evaluation happen in parallel.
+
+const COACH_SYSTEM_PROMPT = `You are a real-time coach for an Aira Fitness sales rep practicing a consultation.
+
+You see the full conversation so far. Evaluate ONLY the rep's most recent message — was it on-script for the Aira sales process at this point in the consult?
+
+THE AIRA SCRIPT (what the rep should be doing, in order):
+
+1. SIT-DOWN (when prospect first sits at desk, before any pricing): "At our gym we are month to month — there are no contracts, you can cancel anytime. You just pay your first month, last month, and a one-time enrollment fee like every other gym. Make sense?" — all 5 components.
+
+2. PRESENT 3 TIERS with brief description of each, then ASSUMPTIVE CLOSE: "Which one would you like to get started with today?" (NOT "Do you want to join?")
+
+3. ID COLLECTION as a STATEMENT: "Awesome. Do you have your ID and I can create your profile." (NOT "Do you have your ID to get you started?")
+
+4. ON OBJECTION ("let me think about it" / "I need to talk to my wife" / etc): Run THE DEAF EAR CLOSE first, before offering anything: "I totally understand. Did you like the gym? Does it have everything you need? Is it more about the upfront costs that's stopping you from joining today?"
+
+5. IF COST IS THE ISSUE: COUPON DROP — "Did you happen to get our coupon mailer? It discounted the enrollment 50%. Would that help?"
+
+6. IF TIMING IS THE ISSUE: PAYMENT-TIMING SOLUTION first (post-date to payday, split billing) — closes at full price. ONLY if that fails, escalate to Google Review Drop.
+
+7. SPOUSE/PARTNER OBJECTION: "If your partner doesn't join, would you still be interested?" → "I can sign you up today and put a free pass on your account for them." Do NOT just say "bring her in for a tour."
+
+8. AFTER CLOSING: PIF offer ("year up front for 20% off + 2 months free") then REFERRAL COLLECT ("first month only, you can bring 5 people for free — write down whoever you'd like to give a free pass to").
+
+WHAT TO DO:
+- Look at the rep's MOST RECENT MESSAGE only.
+- Decide: was it on-track or off-track?
+- BE GENEROUS — only flag clear, meaningful deviations. Wording-level differences that still create the right feeling are FINE. Strategic questions ("Would that help you out?", "Is that fair?") are CORRECT, not permission-seeking.
+- If they nailed it, return on_track: true with a brief positive note (one short phrase like "Sit-down hit clean" or "Assumptive close — locked in").
+- If they're off-track, return on_track: false with:
+  - a one-sentence hint of what they should do instead
+  - a single suggested alternative wording (the actual sentence they could have said)
+
+OUTPUT — return ONLY valid JSON, no markdown, no commentary:
+{
+  "on_track": true|false,
+  "note": "short positive note if on_track, otherwise one-sentence hint",
+  "suggestion": "if off_track, one alternative sentence the rep could try; otherwise empty string"
+}`;
+
+async function evaluateRepMove(messages) {
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 250,
+      system: COACH_SYSTEM_PROMPT,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    });
+    const raw = message.content[0].text.trim();
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      on_track: parsed.on_track === true,
+      note: String(parsed.note || "").trim(),
+      suggestion: String(parsed.suggestion || "").trim(),
+    };
+  } catch (err) {
+    console.error("[Coach] eval failed:", err.message);
+    return { on_track: true, note: "", suggestion: "" }; // fail-open — never block the conversation
+  }
 }
 
 async function chatAsProspect(session_id, rep_message) {
@@ -830,7 +899,13 @@ async function chatAsProspect(session_id, rep_message) {
   session.messages.push({ role: "user", content: rep_message });
   session.last_active = Date.now();
 
-  const message = await anthropic.messages.create({
+  // In coach mode, evaluate the rep's move and the prospect's response in parallel.
+  const messagesForEval = session.messages.slice();
+  const coachPromise = session.coach_mode
+    ? evaluateRepMove(messagesForEval)
+    : Promise.resolve(null);
+
+  const prospectPromise = anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 300,
     system: session.scenario.systemPrompt,
@@ -839,9 +914,14 @@ async function chatAsProspect(session_id, rep_message) {
       content: m.content,
     })),
   });
-  const reply = message.content[0].text.trim();
+
+  const [prospectResp, coach] = await Promise.all([
+    prospectPromise,
+    coachPromise,
+  ]);
+  const reply = prospectResp.content[0].text.trim();
   session.messages.push({ role: "assistant", content: reply });
-  return reply;
+  return { reply, coach };
 }
 
 function getPracticeSession(session_id) {
