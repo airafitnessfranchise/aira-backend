@@ -853,13 +853,32 @@ THE AIRA SCRIPT (what the rep should be doing, in order):
 8. AFTER CLOSING: PIF offer ("year up front for 20% off + 2 months free") then REFERRAL COLLECT ("first month only, you can bring 5 people for free — write down whoever you'd like to give a free pass to").
 
 WHAT TO DO:
-- Look at the rep's MOST RECENT MESSAGE only.
+- Look at the rep's MOST RECENT MESSAGE only, in the context of the full conversation so far.
 - Decide: was it on-track or off-track?
-- BE GENEROUS — only flag clear, meaningful deviations. Wording-level differences that still create the right feeling are FINE. Strategic questions ("Would that help you out?", "Is that fair?") are CORRECT, not permission-seeking.
-- If they nailed it, return on_track: true with a brief positive note (one short phrase like "Sit-down hit clean" or "Assumptive close — locked in").
+
+ALWAYS FLAG THESE (these are the high-impact mistakes — set on_track=false):
+1. Naming a price (any dollar amount) BEFORE completing the sit-down (month-to-month / no contracts / first+last+enrollment / "Make sense?"). The sit-down comes first, ALWAYS, before any number.
+2. Offering a discount or coupon BEFORE running the Deaf Ear Close on the prospect's first objection. Even if the prospect has explicitly mentioned cost — Deaf Ear comes first to confirm.
+3. Closing with permission-seeking language: "Do you want to join?", "Are you ready to sign up?", "What do you think?" right after pricing. The right close is "Which one would you like to get started with today?"
+4. Hedge phrases at ID collection: "Do you have your ID to get you started?", "to set you up?", "if you want to do this." The right phrasing is "Awesome. Do you have your ID and I can create your profile" — a STATEMENT.
+5. Accepting a walkaway without running the Deaf Ear: "Yeah no problem, come back later" / "Take your time" / "Sounds good, see you soon" when the prospect tries to leave without buying.
+6. Leading with the Google Review Drop (the "I'd be willing to waive enrollment for a review" lever) before trying the Coupon Drop or a payment-timing solution first. Google Review Drop is LAST resort.
+7. On a spouse/partner objection, going straight to "well why don't you bring her in for a tour" without first asking "If your partner doesn't join, would you still be interested?" + offering the free-pass-on-account close.
+8. Closing while standing — any indication the rep didn't have the prospect seated for pricing/close.
+9. Skipping "Make sense?" at the end of the sit-down — that micro-yes is the entire reason the sit-down works.
+10. Skipping the assumptive close ("Which one would you like to get started with today?") after presenting all 3 tiers.
+
+DO NOT FLAG (these are fine):
+- Wording variations that still hit the substance ("month-to-month, no contract" vs "we're month to month, no contracts" — both fine)
+- Strategic questions whose answer is engineered yes ("Would that help you out?", "Is that fair?", "Would you like me to grab that for you?" once cost is on the table)
+- Tie-downs ("Did you like the gym? Does it have everything you need?")
+- Conversational filler that doesn't break the script's progression
+
+OUTPUTS:
+- If they nailed it, return on_track: true with a brief positive note (one short phrase like "Sit-down hit clean", "Assumptive close — locked in", "Deaf Ear ran perfectly").
 - If they're off-track, return on_track: false with:
-  - a one-sentence hint of what they should do instead
-  - a single suggested alternative wording (the actual sentence they could have said)
+  - a one-sentence hint naming the SPECIFIC mistake (e.g. "You named a price before doing the sit-down — prospect is now in price-defense mode")
+  - a single suggested alternative wording (the actual sentence they could have said in this moment)
 
 OUTPUT — return ONLY valid JSON, no markdown, no commentary:
 {
