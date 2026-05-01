@@ -3672,156 +3672,264 @@ app.get("/practice", (req, res) => {
 
   res.send(`<!DOCTYPE html><html><head><title>Aira Practice — Objection Bot</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#EEF1F4;color:#111827;-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column;}
-a{color:#0284C7;}
-.brand{background:#0A0A0A;padding:18px 28px;text-align:center;flex-shrink:0;}
-.brand-mark{font-size:20px;font-weight:900;letter-spacing:.18em;line-height:1;}
-.brand-mark .b{color:#00AEEF;} .brand-mark .w{color:#fff;}
-.subhead{background:#fff;border-bottom:3px solid #00AEEF;padding:18px 28px;flex-shrink:0;}
-.subhead-inner{max-width:760px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
-.eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.18em;text-transform:uppercase;margin-bottom:4px;}
-.title{font-size:20px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;}
-.subtitle{font-size:12px;color:#6B7280;margin-top:2px;}
-.back{font-size:12px;color:#6B7280;text-decoration:none;font-weight:600;}
-.back:hover{color:#0A0A0A;}
+html,body{min-height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;
+  background:#05080F;
+  color:#E5E7EB;
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+/* Animated aurora background */
+body::before{
+  content:'';position:fixed;inset:-50%;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, rgba(0,174,239,0.20), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 80% 30%, rgba(124,58,237,0.16), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 90%, rgba(236,72,153,0.10), transparent 60%);
+  filter:blur(40px);z-index:0;animation:auroraShift 20s ease-in-out infinite alternate;
+}
+@keyframes auroraShift{0%{transform:translate(0,0) rotate(0);}100%{transform:translate(-3%,3%) rotate(2deg);}}
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.7;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 47% 73%, rgba(0,174,239,0.5), transparent),
+    radial-gradient(1px 1px at 82% 27%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 33% 88%, rgba(124,58,237,0.4), transparent),
+    radial-gradient(1px 1px at 67% 52%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(2px 2px at 15% 65%, rgba(0,174,239,0.6), transparent);
+  background-size:100% 100%;
+}
 
-.stage{flex:1;display:flex;flex-direction:column;max-width:760px;width:100%;margin:0 auto;padding:20px 24px;min-height:0;}
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;}
+.shell{max-width:760px;width:100%;margin:0 auto;flex:1;display:flex;flex-direction:column;padding:20px 24px;}
 
-.start-screen{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:32px;}
-.start-eyebrow{font-size:11px;font-weight:800;color:#00AEEF;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;}
-.start-title{font-size:24px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin-bottom:8px;}
-.start-body{font-size:14px;color:#6B7280;line-height:1.6;margin-bottom:20px;}
-label.fld{display:block;margin-bottom:14px;}
-label.fld span{display:block;font-size:11px;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
-label.fld select{width:100%;padding:10px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:14px;background:#fff;font-family:inherit;}
-button.cta{display:inline-block;padding:12px 28px;background:#0A0A0A;color:#fff;border:0;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.02em;}
-button.cta:hover{background:#1F2937;}
-button.cta.secondary{background:#fff;color:#0A0A0A;border:1px solid #D1D5DB;}
-button.cta.secondary:hover{background:#F3F4F6;}
-button.cta:disabled{opacity:.5;cursor:not-allowed;}
+/* HEADER */
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px;flex-wrap:wrap;gap:12px;}
+.logo{font-size:18px;font-weight:900;letter-spacing:.2em;}
+.logo .b{color:#00AEEF;text-shadow:0 0 24px rgba(0,174,239,.55);}
+.logo .w{color:#fff;}
+.logo .badge{display:inline-block;margin-left:14px;padding:4px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border-radius:999px;font-size:11px;letter-spacing:.16em;text-shadow:none;font-weight:800;}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.header-link{display:inline-flex;align-items:center;padding:7px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#9CA3AF;border-radius:999px;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.04em;transition:all .15s;}
+.header-link:hover{border-color:rgba(0,174,239,0.4);color:#22D3EE;}
+.header-link.game{background:rgba(0,174,239,0.08);border-color:rgba(0,174,239,0.3);color:#22D3EE;}
+.header-link.game:hover{background:rgba(0,174,239,0.15);}
 
-.chat-frame{background:#fff;border:1px solid #E5E7EB;border-radius:10px;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
-.chat-header{padding:14px 18px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.chat-persona{font-size:12px;color:#6B7280;font-weight:600;}
-.chat-persona b{color:#0A0A0A;}
-.chat-end{padding:6px 14px;background:#fff;border:1px solid #DC2626;color:#DC2626;border-radius:9999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;}
-.chat-end:hover{background:#FEE2E2;}
+.stage{flex:1;display:flex;flex-direction:column;min-height:0;}
 
-.chat-body{flex:1;overflow-y:auto;padding:18px;background:#F9FAFB;display:flex;flex-direction:column;gap:10px;}
-.bubble{max-width:80%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5;}
-.bubble.prospect{background:#fff;border:1px solid #E5E7EB;color:#111827;align-self:flex-start;border-bottom-left-radius:4px;}
-.bubble.rep{background:#0A0A0A;color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
-.bubble.thinking{background:#fff;border:1px solid #E5E7EB;color:#9CA3AF;align-self:flex-start;font-style:italic;border-bottom-left-radius:4px;}
+/* SPLASH */
+.splash{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 0 40px;}
+.splash h1{
+  font-size:clamp(36px,6vw,60px);font-weight:900;line-height:1;letter-spacing:-.02em;
+  background:linear-gradient(120deg,#00AEEF 0%,#7C3AED 50%,#EC4899 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  margin-bottom:14px;filter:drop-shadow(0 4px 24px rgba(0,174,239,.3));
+  animation:slideUp .7s ease-out;
+}
+.splash .tag{font-size:15px;color:#9CA3AF;margin-bottom:32px;max-width:520px;line-height:1.6;animation:slideUp .9s ease-out;}
+.splash .tag a{color:#22D3EE;font-weight:700;text-decoration:none;}
+.splash .tag a:hover{text-decoration:underline;}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 
-/* Coach hint bubbles — render between rep and prospect bubbles in coach mode */
-.coach-bubble{align-self:stretch;max-width:100%;background:#FFFBEB;border:1px solid #FCD34D;border-left:4px solid #F59E0B;border-radius:10px;padding:12px 14px;margin:2px 0;animation:fadeIn .25s ease-out;}
-.coach-bubble.on{background:#ECFDF5;border-color:#86EFAC;border-left-color:#22C55E;}
-.coach-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.start-card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;padding:28px;width:100%;max-width:480px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:0 8px 40px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05);
+  animation:slideUp 1.1s ease-out;text-align:left;
+}
+label.fld{display:block;margin-bottom:16px;}
+label.fld > span{display:block;font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.14em;font-weight:800;margin-bottom:8px;}
+label.fld select{
+  width:100%;padding:12px 14px;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;font-size:14px;font-family:inherit;
+  transition:border-color .2s,background .2s;
+}
+label.fld select:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.06);}
+label.fld select option{background:#0A0F1E;color:#fff;}
+
+.coach-toggle{
+  display:flex !important;align-items:flex-start;gap:12px;padding:16px;
+  background:linear-gradient(135deg,rgba(0,174,239,0.08),rgba(124,58,237,0.06));
+  border:1px solid rgba(0,174,239,0.25) !important;border-radius:12px;cursor:pointer;
+  margin-bottom:18px !important;transition:border-color .2s;
+}
+.coach-toggle:hover{border-color:rgba(0,174,239,0.5) !important;}
+.coach-toggle input{margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px;accent-color:#00AEEF;}
+.coach-toggle .ct-body{display:block;letter-spacing:0;text-transform:none;color:#E5E7EB;font-weight:500;font-size:13px;line-height:1.55;margin-bottom:0;}
+.coach-toggle .ct-title{font-weight:800;display:block;margin-bottom:4px;letter-spacing:0;text-transform:none;color:#22D3EE;font-size:14px;}
+.coach-toggle .ct-new{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;padding:2px 8px;border-radius:9999px;margin-left:6px;vertical-align:middle;}
+
+button.cta{
+  width:100%;padding:14px 24px;
+  background:linear-gradient(135deg,#00AEEF 0%,#7C3AED 100%);
+  border:0;color:#fff;border-radius:12px;font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  cursor:pointer;box-shadow:0 8px 24px rgba(0,174,239,.35);
+  transition:transform .15s,box-shadow .15s,filter .15s;font-family:inherit;
+}
+button.cta:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,174,239,.45);filter:brightness(1.08);}
+button.cta:active{transform:translateY(0);}
+button.cta:disabled{opacity:.5;cursor:wait;transform:none;}
+button.cta.secondary{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);box-shadow:none;}
+button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
+
+/* CHAT */
+.chat-frame{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:480px;
+  overflow:hidden;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.chat-header{padding:16px 22px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;gap:12px;flex-wrap:wrap;}
+.chat-persona{font-size:12px;color:#9CA3AF;font-weight:600;}
+.chat-persona b{color:#fff;}
+.chat-end{padding:8px 16px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);color:#FCA5A5;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:background .2s;}
+.chat-end:hover{background:rgba(220,38,38,0.18);}
+.chat-end:disabled{opacity:.5;cursor:wait;}
+
+.chat-body{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:10px;}
+.bubble{max-width:78%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.55;animation:fadeIn .25s ease-out;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.bubble.prospect{background:rgba(255,255,255,0.06);color:#E5E7EB;align-self:flex-start;border-bottom-left-radius:6px;}
+.bubble.rep{background:linear-gradient(135deg,#0284C7,#00AEEF);color:#fff;align-self:flex-end;border-bottom-right-radius:6px;box-shadow:0 4px 16px rgba(0,174,239,0.25);}
+.bubble.thinking{background:rgba(255,255,255,0.04);color:#6B7280;align-self:flex-start;font-style:italic;border-bottom-left-radius:6px;}
+
+/* Coach hints — dark glass with brand-blue (on-track) or amber (off-track) */
+.coach-bubble{align-self:stretch;max-width:100%;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-left:4px solid #F59E0B;border-radius:12px;padding:14px 16px;margin:2px 0;animation:fadeIn .25s ease-out;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+.coach-bubble.on{background:rgba(34,197,94,0.06);border-color:rgba(34,197,94,0.3);border-left-color:#22C55E;}
+.coach-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .coach-icon{font-size:14px;}
-.coach-label{font-size:10px;font-weight:800;color:#92400E;letter-spacing:.14em;text-transform:uppercase;}
-.coach-bubble.on .coach-label{color:#15803D;}
-.coach-note{font-size:13.5px;color:#3A2410;line-height:1.5;font-weight:500;}
-.coach-bubble.on .coach-note{color:#0A2410;}
-.coach-suggest{background:#fff;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-top:10px;}
-.coach-suggest-label{font-size:9px;font-weight:800;color:#92400E;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px;}
-.coach-suggest-text{font-size:13.5px;color:#0A0A0A;line-height:1.55;font-style:italic;margin-bottom:8px;}
-.coach-use{padding:5px 10px;background:#0A0A0A;color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:inherit;}
-.coach-use:hover{background:#1F2937;}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
+.coach-label{font-size:10px;font-weight:800;color:#FBBF24;letter-spacing:.14em;text-transform:uppercase;}
+.coach-bubble.on .coach-label{color:#86EFAC;}
+.coach-note{font-size:13.5px;color:#FED7AA;line-height:1.55;font-weight:500;}
+.coach-bubble.on .coach-note{color:#BBF7D0;}
+.coach-suggest{background:rgba(0,0,0,0.3);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:12px 14px;margin-top:12px;}
+.coach-suggest-label{font-size:9px;font-weight:800;color:#FBBF24;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px;}
+.coach-suggest-text{font-size:13.5px;color:#fff;line-height:1.55;font-style:italic;margin-bottom:10px;}
+.coach-use{padding:6px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border:0;border-radius:8px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:filter .15s;}
+.coach-use:hover{filter:brightness(1.1);}
 
-.chat-input{padding:14px;border-top:1px solid #F3F4F6;display:flex;gap:10px;flex-shrink:0;background:#fff;}
-.chat-input textarea{flex:1;padding:10px 14px;border:1px solid #D1D5DB;border-radius:8px;font-size:14px;font-family:inherit;resize:none;min-height:42px;max-height:140px;line-height:1.4;}
-.chat-input textarea:focus{outline:none;border-color:#00AEEF;}
-.chat-input button{padding:10px 20px;background:#00AEEF;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
-.chat-input button:hover{background:#0284C7;}
-.chat-input button:disabled{background:#9CA3AF;cursor:not-allowed;}
+.chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:10px;align-items:flex-end;flex-shrink:0;}
+.chat-input textarea{flex:1;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:14px;font-family:inherit;resize:none;min-height:46px;max-height:140px;line-height:1.4;transition:border-color .2s;}
+.chat-input textarea:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.04);}
+.chat-input textarea::placeholder{color:#6B7280;}
+.chat-input button{padding:12px 22px;background:linear-gradient(135deg,#00AEEF,#7C3AED);border:0;color:#fff;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.04em;text-transform:uppercase;transition:transform .15s,filter .15s;flex-shrink:0;}
+.chat-input button:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.chat-input button:disabled{opacity:.5;cursor:wait;transform:none;}
 
-.score-screen{background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:28px;}
-.score-eyebrow{font-size:10px;font-weight:800;color:#00AEEF;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;}
-.score-title{font-size:22px;font-weight:900;color:#0A0A0A;letter-spacing:-.01em;margin-bottom:18px;}
-.score-big-wrap{text-align:center;padding:22px;background:#F9FAFB;border-radius:8px;margin-bottom:18px;}
-.score-label{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
-.score-num{font-size:54px;font-weight:900;line-height:1.05;margin-top:6px;letter-spacing:-.02em;}
-.score-num span{font-size:20px;color:#9CA3AF;font-weight:600;}
-.closed-pill{display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;}
-.closed-pill.no{background:#fff;border:1px solid #DC2626;color:#DC2626;}
-.score-summary{padding:14px 16px;background:#F9FAFB;border-left:3px solid #00AEEF;border-radius:4px;margin-bottom:14px;font-size:13px;color:#111827;line-height:1.55;}
+/* SCORE SCREEN */
+.score-screen{padding:0 0 24px;}
+.celebration{
+  text-align:center;padding:40px 24px;
+  background:linear-gradient(135deg,rgba(0,174,239,0.08),rgba(124,58,237,0.08));
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;margin-bottom:18px;animation:slideUp .6s ease-out;
+}
+.celebration h2{
+  font-size:clamp(28px,5vw,44px);font-weight:900;line-height:1;
+  background:linear-gradient(120deg,#22D3EE,#7C3AED,#EC4899);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  letter-spacing:-.02em;margin-bottom:14px;
+  filter:drop-shadow(0 4px 24px rgba(0,174,239,.4));
+}
+.celebration .sub{font-size:14px;color:#9CA3AF;margin-bottom:18px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.6;}
+.celebration .score-display{display:inline-flex;align-items:baseline;gap:6px;font-weight:900;font-size:64px;letter-spacing:-.03em;}
+.celebration .score-display .of{font-size:22px;color:#9CA3AF;font-weight:700;}
+.celebration.win .score-display{color:#22D3EE;text-shadow:0 0 32px rgba(34,211,238,0.5);}
+.celebration.fail .score-display{color:#EC4899;}
+.closed-pill{display:inline-block;padding:6px 14px;background:#0A0A0A;color:#fff;border-radius:9999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-top:14px;}
+.closed-pill.no{background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.4);color:#FCA5A5;}
+.closed-pill .check{color:#22D3EE;}
+
+.scorecard-block{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;margin-bottom:14px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.section-eyebrow{font-size:10px;font-weight:800;color:#9CA3AF;text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;}
+.score-summary{padding:16px 18px;background:rgba(0,174,239,0.06);border-left:3px solid #00AEEF;border-radius:8px;margin-bottom:14px;font-size:14px;color:#E5E7EB;line-height:1.65;}
 .cat-row{margin-top:14px;}
 .cat-row-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
-.cat-label{font-size:13px;font-weight:700;color:#111827;}
+.cat-label{font-size:13px;font-weight:700;color:#fff;}
 .cat-score{font-size:14px;font-weight:800;}
-.cat-bar{background:#F3F4F6;border-radius:9999px;height:6px;overflow:hidden;}
-.cat-bar-fill{height:6px;border-radius:9999px;}
-.coaching{background:#fff;border:1px solid #E5E7EB;border-left:4px solid #00AEEF;border-radius:6px;padding:18px 20px;margin-top:18px;font-size:14px;color:#111827;line-height:1.65;}
-.coaching p{margin-top:10px;}
-.coaching p:first-child{margin-top:0;}
-.coaching-header{font-size:11px;font-weight:800;color:#0A0A0A;text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;}
-.btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;}
-.conversation{margin-top:18px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:18px 20px;}
-.spinner-row{display:flex;align-items:center;gap:14px;margin-top:18px;}
-.spinner{width:20px;height:20px;border:2.5px solid #E5E7EB;border-top-color:#00AEEF;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
+.cat-bar{background:rgba(255,255,255,0.08);border-radius:9999px;height:6px;overflow:hidden;}
+.cat-bar-fill{height:6px;border-radius:9999px;transition:width .8s cubic-bezier(.2,.7,.3,1);}
+.cat-explainer{font-size:12.5px;color:#9CA3AF;line-height:1.55;margin-top:6px;}
+
+.coaching{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-left:3px solid #00AEEF;border-radius:10px;padding:22px 24px;margin-top:14px;}
+.coaching .head{font-size:11px;font-weight:800;color:#22D3EE;text-transform:uppercase;letter-spacing:.14em;margin-bottom:14px;}
+.coaching .body{font-size:14px;color:#E5E7EB;line-height:1.7;}
+.coaching .body p{margin-top:12px;}
+.coaching .body p:first-child{margin-top:0;}
+
+.btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+.spinner-row{display:flex;align-items:center;gap:14px;margin-top:18px;justify-content:center;}
+.spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,0.1);border-top-color:#00AEEF;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 .hidden{display:none !important;}
 </style></head><body>
 
-<div class="brand"><div class="brand-mark"><span class="b">AIRA</span>&nbsp;<span class="w">FITNESS</span></div></div>
-<div class="subhead"><div class="subhead-inner">
-  <div>
-    <div class="eyebrow">Practice</div>
-    <div class="title">Objection Bot</div>
-    <div class="subtitle">Run a mock consult against an AI prospect. Get scored at the end. &nbsp;·&nbsp; <a href="/scoring" target="_blank" style="color:#0284C7;font-weight:700;text-decoration:none;">How scoring works →</a></div>
-  </div>
-</div></div>
+<div class="app">
+  <div class="shell">
 
-<div class="stage">
-
-  <div id="start" class="start-screen">
-    <div class="start-eyebrow">Set up your consult</div>
-    <div class="start-title">Pick a prospect to practice against</div>
-    <div class="start-body">A new prospect walks into your gym. You greet them, sit them down, present pricing, handle objections, and close the sale. The bot reacts to what you actually say — same psychology as your real consults. You can end the consult any time and get scored.</div>
-
-    <label class="fld"><span>Difficulty</span>
-      <select id="difficulty">${diffOptions}</select>
-    </label>
-    <label class="fld"><span>Your Location</span>
-      <select id="location">
-        <option value="">— Select your gym —</option>
-        ${locOptions}
-      </select>
-    </label>
-    <label class="fld coach-toggle" style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:#F0FBFF;border:1px solid #BAE6FD;border-radius:8px;cursor:pointer;">
-      <input id="coach-mode" type="checkbox" style="margin-top:3px;flex-shrink:0;cursor:pointer;width:18px;height:18px;accent-color:#0284C7;" />
-      <span style="display:block;letter-spacing:0;text-transform:none;color:#0A0A0A;font-weight:500;font-size:13px;line-height:1.5;margin-bottom:0;">
-        <b style="font-weight:800;display:block;margin-bottom:2px;letter-spacing:0;text-transform:none;color:#0284C7;">💡 Coached Mode <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:#00AEEF;color:#fff;padding:2px 6px;border-radius:9999px;margin-left:4px;">NEW</span></b>
-        Get real-time hints when you go off-script. After each thing you type, we'll tell you if it was the right move and suggest better wording when it wasn't. Best for new reps still learning the script.
-      </span>
-    </label>
-    <button class="cta" id="start-btn">Start Consult →</button>
-  </div>
-
-  <div id="chat" class="chat-frame hidden">
-    <div class="chat-header">
-      <div class="chat-persona">Practicing against: <b id="persona-label">—</b></div>
-      <button class="chat-end" id="end-btn">End &amp; Score</button>
+    <div class="header">
+      <div class="logo"><span class="b">AIRA</span><span class="w">FITNESS</span><span class="badge">PRACTICE BOT</span></div>
+      <div class="header-right">
+        <a href="/scoring" target="_blank" class="header-link">📊 How Scoring Works</a>
+        <a href="/airafitnessclosinggame" class="header-link game">🎮 Closing Game →</a>
+      </div>
     </div>
-    <div class="chat-body" id="messages"></div>
-    <div class="chat-input">
-      <textarea id="rep-input" placeholder="What do you say to the prospect?" rows="1"></textarea>
-      <button id="send-btn">Send</button>
+
+    <div class="stage">
+
+      <!-- SPLASH -->
+      <div id="start" class="splash">
+        <h1>Practice Bot</h1>
+        <p class="tag">Run a mock consult against an AI prospect — same psychology as the real floor. Get scored at the end. Try <b style="color:#22D3EE;">Coached Mode</b> for real-time hints while you train.</p>
+        <div class="start-card">
+          <label class="fld"><span>Difficulty</span>
+            <select id="difficulty">${diffOptions}</select>
+          </label>
+          <label class="fld"><span>Your Gym</span>
+            <select id="location"><option value="">— Select your gym —</option>${locOptions}</select>
+          </label>
+          <label class="coach-toggle">
+            <input id="coach-mode" type="checkbox" />
+            <span class="ct-body">
+              <span class="ct-title">💡 Coached Mode <span class="ct-new">NEW</span></span>
+              Real-time hints when you go off-script. After each thing you type, we tell you if it was the right move and suggest better wording when it wasn't. Best for new reps still learning.
+            </span>
+          </label>
+          <button class="cta" id="start-btn">Start Consult →</button>
+        </div>
+      </div>
+
+      <!-- CHAT -->
+      <div id="chat" class="chat-frame hidden">
+        <div class="chat-header">
+          <div class="chat-persona">Practicing against: <b id="persona-label">—</b></div>
+          <button class="chat-end" id="end-btn">End &amp; Score</button>
+        </div>
+        <div class="chat-body" id="messages"></div>
+        <div class="chat-input">
+          <textarea id="rep-input" placeholder="What do you say to the prospect?" rows="1"></textarea>
+          <button id="send-btn">Send</button>
+        </div>
+      </div>
+
+      <!-- SCORE -->
+      <div id="score" class="score-screen hidden"></div>
+
     </div>
   </div>
-
-  <div id="score" class="score-screen hidden"></div>
-
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 let SESSION_ID = null;
 let SCENARIO_ID = '';
+let COACH_MODE = false;
 
-// Track recently-seen scenario IDs so the next session picks something different.
 function rememberScenario(id) {
   if (!id) return;
   const existing = (document.cookie.match(/aira_seen=([^;]+)/) || [])[1] || '';
@@ -3844,8 +3952,6 @@ async function postJson(url, body) {
   return r.json();
 }
 
-let COACH_MODE = false;
-
 $('start-btn').onclick = async () => {
   const difficulty = $('difficulty').value;
   const location_id = $('location').value;
@@ -3866,13 +3972,8 @@ $('start-btn').onclick = async () => {
 };
 
 const repInput = $('rep-input');
-repInput.addEventListener('input', () => {
-  repInput.style.height = 'auto';
-  repInput.style.height = Math.min(repInput.scrollHeight, 140) + 'px';
-});
-repInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send-btn').click(); }
-});
+repInput.addEventListener('input', () => { repInput.style.height = 'auto'; repInput.style.height = Math.min(repInput.scrollHeight, 140) + 'px'; });
+repInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send-btn').click(); }});
 
 function coachBubble(coach) {
   if (!coach) return;
@@ -3915,77 +4016,90 @@ $('send-btn').onclick = async () => {
   repInput.focus();
 };
 
+function resumeChat(){
+  $('score').classList.add('hidden');
+  $('chat').classList.remove('hidden');
+  $('end-btn').disabled = false;
+  $('end-btn').textContent = 'End & Score';
+  $('rep-input').focus();
+}
+
 $('end-btn').onclick = async () => {
   if ($('end-btn').disabled) return;
   $('end-btn').disabled = true;
   $('end-btn').textContent = 'Scoring…';
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
-  $('score').innerHTML = '<div class="score-eyebrow">Scoring</div><div class="score-title">Analyzing your consult…</div><div class="spinner-row"><div class="spinner"></div><div style="color:#6B7280;font-size:13px;">This takes 20-40 seconds. Don\\'t refresh — your score is on the way.</div></div>';
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID });
     if (!r.ok) {
-      $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Error</div><div class="score-title">' + r.error + '</div><button class="cta" onclick="location.reload()">Start Over</button>';
+      const goBack = SESSION_ID ? '<button class="cta secondary" onclick="resumeChat()">← Back to consult</button> ' : '';
+      $('score').innerHTML = '<div class="celebration fail"><h2>Couldn\\'t score yet</h2><p class="sub">' + r.error + '</p><div class="btn-row" style="justify-content:center;">' + goBack + '<button class="cta secondary" onclick="location.reload()">Start Over</button></div></div>';
+      $('end-btn').disabled = false;
+      $('end-btn').textContent = 'End & Score';
       return;
     }
     rememberScenario(r.scenario_id || SCENARIO_ID);
     renderScorecard(r.scorecard, r.messages);
   } catch (err) {
-    $('score').innerHTML = '<div class="score-eyebrow" style="color:#DC2626;">Connection Error</div><div class="score-title">Couldn\\'t reach the scorer.</div><div style="color:#6B7280;font-size:13px;margin-top:10px;">' + (err.message || err) + '</div><div class="btn-row"><button class="cta" onclick="$(\\'end-btn\\').click()">Try Again</button> <button class="cta secondary" onclick="location.reload()">Start Over</button></div>';
+    $('score').innerHTML = '<div class="celebration fail"><h2>Connection Error</h2><p class="sub">Couldn\\'t reach the scorer. ' + (err.message || err) + '</p><div class="btn-row" style="justify-content:center;"><button class="cta secondary" onclick="resumeChat()">← Back to consult</button> <button class="cta" onclick="$(\\'end-btn\\').click()">Try scoring again</button></div></div>';
+    $('end-btn').disabled = false;
+    $('end-btn').textContent = 'End & Score';
   }
 };
 
-function colorFor(score, max) {
-  const pct = (score / max) * 100;
-  return pct >= 70 ? '#00AEEF' : pct >= 50 ? '#0284C7' : '#DC2626';
-}
-
-function escapeHtml(t) {
-  return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+function colorFor(score, max) { const p = (score/max)*100; return p>=70?'#22D3EE':p>=50?'#0284C7':'#EC4899'; }
+function escapeHtml(t) { return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 function renderConversation(messages) {
   if (!messages || !messages.length) return '';
   const rows = messages.map(m => {
     const isRep = m.role === 'user';
     const label = isRep ? 'YOU SAID' : 'PROSPECT SAID';
-    const labelColor = isRep ? '#00AEEF' : '#6B7280';
-    const bg = isRep ? '#F0FBFF' : '#F9FAFB';
-    const border = isRep ? '#BAE6FD' : '#E5E7EB';
-    return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;padding:12px 14px;margin-bottom:8px;">' +
+    const labelColor = isRep ? '#22D3EE' : '#9CA3AF';
+    const bg = isRep ? 'rgba(0,174,239,0.06)' : 'rgba(255,255,255,0.04)';
+    const border = isRep ? 'rgba(0,174,239,0.2)' : 'rgba(255,255,255,0.08)';
+    return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:8px;padding:10px 14px;margin-bottom:8px;">' +
       '<div style="font-size:10px;font-weight:800;letter-spacing:.14em;color:' + labelColor + ';margin-bottom:4px;">' + label + '</div>' +
-      '<div style="font-size:13.5px;color:#111827;line-height:1.55;">' + escapeHtml(m.content) + '</div>' +
+      '<div style="font-size:13.5px;color:#E5E7EB;line-height:1.55;">' + escapeHtml(m.content) + '</div>' +
     '</div>';
   }).join('');
-  return '<div class="conversation"><div class="coaching-header" style="margin-bottom:10px;">The Conversation</div>' + rows + '</div>';
+  return '<div class="scorecard-block"><div class="section-eyebrow">The Conversation</div>' + rows + '</div>';
 }
 
 function renderScorecard(s, messages) {
   const total = s.total_score || 0;
   const totalColor = colorFor(total, 100);
   const closed = s.did_close === true;
+  const passed = closed && total >= 70;
+  const win = passed;
+
+  const headline = win ? (total >= 90 ? 'PERFECT EXECUTION' : 'STRONG WORK') : (closed ? 'CLOSED — BUT NOT QUITE' : 'PROSPECT WALKED');
+  const sub = win ? 'You scored ' + total + ' and closed the sale. That's the bar.' : (closed ? 'You closed at ' + total + ' — passing the bar (in the game) requires 70+ AND a closed sale.' : 'No sale today. Read the coaching below — the script knows where the gap was.');
+
   const sections = [
-    ['Sit-Down Presentation', s.sitdown_score, s.sitdown_score_explainer],
-    ['Objection Handling', s.objection_score, s.objection_score_explainer],
-    ['Language & Psychology', s.language_score, s.language_score_explainer],
-    ['Close Execution', s.close_score, s.close_score_explainer],
+    ['Sit-Down Presentation', s.sitdown_score || 0, s.sitdown_score_explainer],
+    ['Objection Handling', s.objection_score || 0, s.objection_score_explainer],
+    ['Language & Psychology', s.language_score || 0, s.language_score_explainer],
+    ['Close Execution', s.close_score || 0, s.close_score_explainer],
   ];
   const catRows = sections.map(([label, score, expl]) => {
     const c = colorFor(score, 25);
     const pct = (score / 25) * 100;
-    return '<div class="cat-row"><div class="cat-row-head"><div class="cat-label">' + label + '</div><div class="cat-score" style="color:' + c + ';">' + score + '<span style="color:#9CA3AF;font-weight:600;"> / 25</span></div></div><div class="cat-bar"><div class="cat-bar-fill" style="background:' + c + ';width:' + pct + '%;"></div></div>' + (expl ? '<div style="font-size:13px;color:#6B7280;line-height:1.5;margin:6px 0 0;">' + expl + '</div>' : '') + '</div>';
+    return '<div class="cat-row"><div class="cat-row-head"><div class="cat-label">' + label + '</div><div class="cat-score" style="color:' + c + ';">' + score + '<span style="color:#9CA3AF;font-weight:600;"> / 25</span></div></div><div class="cat-bar"><div class="cat-bar-fill" style="background:' + c + ';width:' + pct + '%;"></div></div>' + (expl ? '<div class="cat-explainer">' + expl + '</div>' : '') + '</div>';
   }).join('');
   const coaching = (s.overall_coaching || s.coaching_note || '').trim();
-  const coachingHtml = coaching ? '<div class="coaching"><div class="coaching-header">Coaching Notes</div><p>' + coaching.replace(/\\n\\n+/g, '</p><p>').replace(/\\n/g, ' ') + '</p></div>' : '';
+  const coachingHtml = coaching ? '<div class="coaching"><div class="head">Coaching Notes</div><div class="body"><p>' + coaching.replace(/\\n\\n+/g, '</p><p>').replace(/\\n/g, ' ') + '</p></div></div>' : '';
 
   $('score').innerHTML =
-    '<div class="score-eyebrow">Practice Result</div>' +
-    '<div class="score-title">Your Scorecard</div>' +
-    '<div class="score-big-wrap"><div class="score-label">Overall Score</div><div class="score-num" style="color:' + totalColor + ';">' + total + '<span> / 100</span></div>' +
-    (closed ? '<div class="closed-pill"><span style="color:#00AEEF;">✓</span> Sale Closed</div>' : '<div class="closed-pill no">No Sale</div>') +
+    '<div class="celebration ' + (win?'win':'fail') + '">' +
+      '<h2>' + headline + '</h2>' +
+      '<p class="sub">' + sub + '</p>' +
+      '<div class="score-display">' + total + '<span class="of">/ 100</span></div>' +
+      (closed ? '<div class="closed-pill"><span class="check">✓</span> SALE CLOSED</div>' : '<div class="closed-pill no">NO SALE</div>') +
     '</div>' +
-    (s.ai_summary ? '<div class="score-summary">' + s.ai_summary + '</div>' : '') +
-    catRows +
+    '<div class="scorecard-block"><div class="section-eyebrow">Score Breakdown</div>' + catRows + '</div>' +
     coachingHtml +
     renderConversation(messages) +
     '<div class="btn-row"><button class="cta" onclick="location.reload()">Practice Again</button></div>';
