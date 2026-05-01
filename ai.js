@@ -209,13 +209,23 @@ When you see a rep retreat — name it. Tell them what they were feeling in that
 
 SCORING
 
-Score each category 0-25 based on execution quality:
+Score each category 0-25 based on execution quality.
+
+CRITICAL RULE — ONE GAP, ONE CATEGORY. Each missed move belongs to exactly one of the four categories. Do NOT dock the same gap in multiple categories. If a rep skipped referral collection, that's a Close Execution miss only — do NOT also dock Language & Psychology for it. If a rep skipped the Deaf Ear, that's Objection Handling only — do NOT also dock Language. Each category covers a different surface area:
+- SIT-DOWN PRESENTATION → the opening pricing presentation only
+- OBJECTION HANDLING → the Deaf Ear sequence, Coupon Drop, payment-timing, Google Review Drop
+- LANGUAGE & PSYCHOLOGY → only how the rep talks (assumptive vs permission-seeking, tie-downs, tone). NOT post-close mechanics.
+- CLOSE EXECUTION → the close itself, ID collection, PIF, By The Way Close, referrals — every "after the prospect picks a tier" move.
+
+If you find yourself docking the same specific gap in two categories, you are wrong. Pick the correct one and move full credit to the others.
+
+Category-specific bars:
 
 SIT-DOWN PRESENTATION (0-25): Did the rep deliver the sit-down before the price sheet was flipped? The five components are: (1) month-to-month, (2) no contracts / cancel anytime, (3) first + last + enrollment fee, (4) "like every other gym" framing, (5) "Make sense?" close. Hit all five = full credit on the script element. Do NOT dock for omissions of phrases that are not in the script (e.g. "one-time fee, not yearly" is not in the script). Were all 3 tiers presented? Was assumptive close language used? Was the price sheet face down until the sit-down completed? Did the rep stay seated for the close (never closed while standing)?
 
 OBJECTION HANDLING (0-25): Deaf Ear Close run on first objection before any offer? Objection isolated before discount offered? Coupon Drop used only after cost confirmed? Payment-timing solution attempted before the Google Review Drop when the objection was timing-based (do not dock if the rep closed at full price via post-dating or split billing — that's a better outcome than waiving the enrollment)? Google Review Drop used only as last resort? Drops used in correct sequence?
 
-LANGUAGE AND PSYCHOLOGY (0-25): Reward question-led leadership — tie-downs, strategic questions whose answer is obvious yes ("Would that help you out?", "Is that fair?", "Would you like me to grab that?"), and "Make sense?" check-ins are the technique, not weaknesses (see QUESTION-LED LEADERSHIP section above). ONLY dock for TRUE permission-seeking ("Do you want to join?", "Are you ready?", "What do you think?" after pricing) — questions that gave the prospect an out where forward motion was the move. Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness?
+LANGUAGE AND PSYCHOLOGY (0-25): Reward question-led leadership — tie-downs, strategic questions whose answer is obvious yes ("Would that help you out?", "Is that fair?", "Would you like me to grab that?"), and "Make sense?" check-ins are the technique, not weaknesses (see QUESTION-LED LEADERSHIP section above). ONLY dock for TRUE permission-seeking ("Do you want to join?", "Are you ready?", "What do you think?" after pricing) — questions that gave the prospect an out where forward motion was the move. Tie-downs run when buying signals appeared? Conversation control maintained? Calm and warm after objections — no caving, no defensiveness? IMPORTANT — this category is ONLY about how the rep talks. Do NOT dock here for missing post-close moves (PIF, referrals, By The Way Close) — those are scored under CLOSE EXECUTION. Do NOT dock here for missing the Deaf Ear or Coupon Drop sequence — those are OBJECTION HANDLING. One gap, one category.
 
 CLOSE EXECUTION (0-25): Direct assumptive close attempted ("Which one would you like to get started with today?")? After the prospect picked a tier, did the rep ASSUME the sale at the ID-collection moment ("Do you have your ID and I can create your profile") rather than re-introducing a decision point ("Do you have your ID to get you started?" / "to set you up?" — these phrasings hedge the very assumption you just closed and lose the sale at the desk)? Re-closed after objections without skipping sequence? On the spouse/partner objection, did the rep run the Deaf Ear, then if the gap is partner-approval (not cost), did they ask "if your partner doesn't join, would you still be interested?" and offer the free-pass-on-account close instead of letting the prospect leave the desk to "talk it over"? By The Way Close used at end of free pass visit if applicable? PIF offered after sign-up? Referrals collected at point of sale?
 
