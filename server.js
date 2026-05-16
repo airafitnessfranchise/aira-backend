@@ -2472,6 +2472,7 @@ body{
   position:relative;
   min-height:100vh;
 }
+body.embed-mode .header{display:none;}
 /* Animated aurora background */
 body::before{
   content:'';
@@ -3100,6 +3101,22 @@ function setPlayerCookies(id, email){
   document.cookie = 'aira_player_id=' + encodeURIComponent(id) + '; path=/; max-age=15552000; SameSite=Lax';
   if (email) document.cookie = 'aira_player_email=' + encodeURIComponent(email) + '; path=/; max-age=15552000; SameSite=Lax';
 }
+const QUERY_PARAMS = new URLSearchParams(window.location.search);
+function applyEmbedMode(){
+  if (QUERY_PARAMS.get('embed') === '1') document.body.classList.add('embed-mode');
+}
+function ensureLocationOption(location_id, label){
+  if (!location_id) return;
+  const select = $('location');
+  if (!select) return;
+  const exists = Array.from(select.options).some(opt => opt.value === location_id);
+  if (!exists) {
+    const option = document.createElement('option');
+    option.value = location_id;
+    option.textContent = label || 'Assigned gym';
+    select.appendChild(option);
+  }
+}
 function loadCachedProfile(){
   const e = (document.cookie.match(/aira_player_email=([^;]+)/)||[])[1];
   const n = (document.cookie.match(/aira_player_name=([^;]+)/)||[])[1];
@@ -3107,6 +3124,19 @@ function loadCachedProfile(){
   if (e) PLAYER.email = decodeURIComponent(e);
   if (n) PLAYER.name = decodeURIComponent(n);
   if (l) PLAYER.location_id = decodeURIComponent(l);
+}
+function loadQueryProfile(){
+  const email = (QUERY_PARAMS.get('email') || '').trim();
+  const name = (QUERY_PARAMS.get('name') || '').trim();
+  const location_id = (QUERY_PARAMS.get('location_id') || '').trim();
+  const location_name = (QUERY_PARAMS.get('location_name') || '').trim();
+  if (email) PLAYER.email = email;
+  if (name) PLAYER.name = name;
+  if (location_id) {
+    PLAYER.location_id = location_id;
+    ensureLocationOption(location_id, location_name);
+  }
+  return !!email;
 }
 function saveProfile(){
   if (PLAYER.email) document.cookie = 'aira_player_email=' + encodeURIComponent(PLAYER.email) + '; path=/; max-age=15552000; SameSite=Lax';
@@ -3488,14 +3518,34 @@ function launchConfetti(){
 }
 
 // ─── boot ───
+applyEmbedMode();
 loadCachedProfile();
+const hasQueryIdentity = loadQueryProfile();
 const cookiePlayerId = getCookiePlayerId();
-if (PLAYER.email && cookiePlayerId){
+if (PLAYER.email) $('player-email').value = PLAYER.email;
+if (PLAYER.name) $('player-name').value = PLAYER.name;
+if (PLAYER.location_id) {
+  ensureLocationOption(PLAYER.location_id);
+  $('location').value = PLAYER.location_id;
+}
+if (hasQueryIdentity){
+  $('enter-btn').disabled = true;
+  $('enter-btn').textContent = 'Loading…';
+  PLAYER.name = PLAYER.name || 'Player';
+  identifyPlayer(PLAYER.email, PLAYER.name, PLAYER.location_id)
+    .then(() => {
+      saveProfile();
+      return fetchProgress();
+    })
+    .then(showMap)
+    .catch(err => {
+      console.error('[Game] portal identity failed', err);
+      $('enter-btn').disabled = false;
+      $('enter-btn').textContent = 'Enter the Game →';
+    });
+} else if (PLAYER.email && cookiePlayerId){
   // Returning player — restore the form values, set the canonical id, and fetch progress.
   PLAYER.id = cookiePlayerId;
-  $('player-email').value = PLAYER.email;
-  if (PLAYER.name) $('player-name').value = PLAYER.name;
-  if (PLAYER.location_id) $('location').value = PLAYER.location_id;
   fetchProgress().then(()=>{
     if (PLAYER.attempts > 0) showMap(); // skip splash, go straight to level map
   });
@@ -3800,6 +3850,7 @@ body{
   min-height:100vh;
   overflow-x:hidden;
 }
+body.embed-mode .header{display:none;}
 /* Animated aurora background */
 body::before{
   content:'';position:fixed;inset:-50%;
@@ -4060,6 +4111,26 @@ const $ = (id) => document.getElementById(id);
 let SESSION_ID = null;
 let SCENARIO_ID = '';
 let COACH_MODE = false;
+const QUERY_PARAMS = new URLSearchParams(window.location.search);
+const EMBED_MODE = QUERY_PARAMS.get('embed') === '1';
+const PLAYER_NAME = (QUERY_PARAMS.get('name') || '').trim();
+
+function applyEmbedMode(){
+  if (EMBED_MODE) document.body.classList.add('embed-mode');
+}
+
+function ensureLocationOption(location_id, label){
+  if (!location_id) return;
+  const select = $('location');
+  if (!select) return;
+  const exists = Array.from(select.options).some(opt => opt.value === location_id);
+  if (!exists) {
+    const option = document.createElement('option');
+    option.value = location_id;
+    option.textContent = label || 'Assigned gym';
+    select.appendChild(option);
+  }
+}
 
 function rememberScenario(id) {
   if (!id) return;
@@ -4090,7 +4161,7 @@ $('start-btn').onclick = async () => {
   if (!location_id) { alert('Please select your gym'); return; }
   $('start-btn').disabled = true;
   $('start-btn').textContent = 'Starting…';
-  const r = await postJson('/practice/start', { difficulty, location_id, coach_mode });
+  const r = await postJson('/practice/start', { difficulty, location_id, coach_mode, player_name: PLAYER_NAME || null });
   if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
   SESSION_ID = r.session_id;
   SCENARIO_ID = r.scenario_id || '';
@@ -4103,6 +4174,13 @@ $('start-btn').onclick = async () => {
   bubble('prospect', r.opening);
   $('rep-input').focus();
 };
+
+applyEmbedMode();
+const queryLocationId = (QUERY_PARAMS.get('location_id') || '').trim();
+if (queryLocationId) {
+  ensureLocationOption(queryLocationId, (QUERY_PARAMS.get('location_name') || '').trim());
+  $('location').value = queryLocationId;
+}
 
 function sceneSet(name) {
   const div = document.createElement('div');
