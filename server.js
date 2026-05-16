@@ -3117,6 +3117,29 @@ function ensureLocationOption(location_id, label){
     select.appendChild(option);
   }
 }
+function applyQueryLocations(){
+  const raw = QUERY_PARAMS.get('locations');
+  if (!raw) return;
+  let locations = [];
+  try {
+    locations = JSON.parse(raw);
+  } catch (err) {
+    console.warn('[Embed] Could not parse locations query param', err);
+    return;
+  }
+  if (!Array.isArray(locations) || !locations.length) return;
+  const select = $('location');
+  if (!select) return;
+  select.innerHTML = '<option value="">— Select your gym —</option>';
+  locations
+    .filter(loc => loc && loc.id)
+    .forEach(loc => {
+      const option = document.createElement('option');
+      option.value = loc.id;
+      option.textContent = loc.name || loc.id;
+      select.appendChild(option);
+    });
+}
 function loadCachedProfile(){
   const e = (document.cookie.match(/aira_player_email=([^;]+)/)||[])[1];
   const n = (document.cookie.match(/aira_player_name=([^;]+)/)||[])[1];
@@ -3519,6 +3542,7 @@ function launchConfetti(){
 
 // ─── boot ───
 applyEmbedMode();
+applyQueryLocations();
 loadCachedProfile();
 const hasQueryIdentity = loadQueryProfile();
 const cookiePlayerId = getCookiePlayerId();
@@ -4131,6 +4155,29 @@ function ensureLocationOption(location_id, label){
     select.appendChild(option);
   }
 }
+function applyQueryLocations(){
+  const raw = QUERY_PARAMS.get('locations');
+  if (!raw) return;
+  let locations = [];
+  try {
+    locations = JSON.parse(raw);
+  } catch (err) {
+    console.warn('[Embed] Could not parse locations query param', err);
+    return;
+  }
+  if (!Array.isArray(locations) || !locations.length) return;
+  const select = $('location');
+  if (!select) return;
+  select.innerHTML = '<option value="">— Select your gym —</option>';
+  locations
+    .filter(loc => loc && loc.id)
+    .forEach(loc => {
+      const option = document.createElement('option');
+      option.value = loc.id;
+      option.textContent = loc.name || loc.id;
+      select.appendChild(option);
+    });
+}
 
 function rememberScenario(id) {
   if (!id) return;
@@ -4176,6 +4223,7 @@ $('start-btn').onclick = async () => {
 };
 
 applyEmbedMode();
+applyQueryLocations();
 const queryLocationId = (QUERY_PARAMS.get('location_id') || '').trim();
 if (queryLocationId) {
   ensureLocationOption(queryLocationId, (QUERY_PARAMS.get('location_name') || '').trim());
