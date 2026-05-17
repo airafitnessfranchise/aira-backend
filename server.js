@@ -168,6 +168,59 @@ function verifyStaffToken(token) {
   return payload;
 }
 
+function signRecordingResultToken(recording) {
+  const secret = process.env.RECORDER_TOKEN_SECRET;
+  if (!secret || !recording?.recording_id) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "HS256", typ: "AIRA-RECORDING-RESULT" };
+  const payload = {
+    iss: "aira-backend",
+    aud: "aira-staff-app",
+    sub: recording.recording_id,
+    location_id: recording.location_id || "unknown",
+    iat: now,
+    exp: now + 60 * 60 * 6,
+  };
+  const encodedHeader = base64url(JSON.stringify(header));
+  const encodedPayload = base64url(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = base64url(
+    crypto.createHmac("sha256", secret).update(signingInput).digest(),
+  );
+  return `${signingInput}.${signature}`;
+}
+
+function verifyRecordingResultToken(token, recordingId) {
+  const secret = process.env.RECORDER_TOKEN_SECRET;
+  if (!secret) throw new Error("missing_recorder_token_secret");
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) throw new Error("malformed_recording_result_token");
+  const [encodedHeader, encodedPayload, signature] = parts;
+  const header = JSON.parse(decodeBase64url(encodedHeader));
+  const payload = JSON.parse(decodeBase64url(encodedPayload));
+  if (header.alg !== "HS256" || header.typ !== "AIRA-RECORDING-RESULT") {
+    throw new Error("unsupported_recording_result_token");
+  }
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const expected = base64url(
+    crypto.createHmac("sha256", secret).update(signingInput).digest(),
+  );
+  if (!timingSafeEqual(signature, expected)) {
+    throw new Error("invalid_recording_result_token_signature");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.iss !== "aira-backend" || payload.aud !== "aira-staff-app") {
+    throw new Error("invalid_recording_result_token_claims");
+  }
+  if (!payload.exp || now - 60 > payload.exp) {
+    throw new Error("recording_result_token_expired");
+  }
+  if (String(payload.sub || "") !== String(recordingId || "")) {
+    throw new Error("recording_result_token_subject_mismatch");
+  }
+  return payload;
+}
+
 function normalizeLocationId(id) {
   return String(id || "").toLowerCase().trim();
 }
@@ -261,9 +314,14 @@ app.post("/upload/recording", upload.single("audio_file"), async (req, res) => {
       contact_name: contact_name || "Walk-in",
     });
   }
+  const resultToken = signRecordingResultToken(recording);
   res.json({
     success: true,
     recording_id: recording.recording_id,
+    result_token: resultToken,
+    result_url: resultToken
+      ? `/recording-result/${encodeURIComponent(recording.recording_id)}`
+      : null,
     message: "Audio received",
   });
   processRecording(
@@ -273,6 +331,96 @@ app.post("/upload/recording", upload.single("audio_file"), async (req, res) => {
     appointment_id,
   );
 });
+
+app.get("/recording-result/:id", async (req, res) => {
+  try {
+    verifyRecordingResultToken(
+      req.query.result_token || req.headers["x-aira-recording-result-token"],
+      req.params.id,
+    );
+    const recording = await db.getRecording(req.params.id);
+    if (!recording) {
+      return res.status(404).json({ ok: false, error: "Recording not found" });
+    }
+    const scorecard = await db.getScorecardByRecording(recording.recording_id);
+    return res.json({
+      ok: true,
+      ready:
+        recording.processing_status === "scored" &&
+        Boolean(scorecard),
+      recording: {
+        recording_id: recording.recording_id,
+        location_id: recording.location_id,
+        contact_name: recording.contact_name,
+        duration_seconds: recording.duration_seconds || 0,
+        recorded_at: recording.recorded_at,
+        processing_status: recording.processing_status,
+      },
+      scorecard: scorecard ? publicScorecard(scorecard) : null,
+    });
+  } catch (err) {
+    return res.status(401).json({
+      ok: false,
+      error: "Recording result token is invalid or expired",
+    });
+  }
+});
+
+function publicScorecard(scorecard) {
+  return {
+    scorecard_id: scorecard.scorecard_id,
+    recording_id: scorecard.recording_id,
+    total_score: scorecard.total_score,
+    sitdown_score: scorecard.sitdown_score,
+    objection_score: scorecard.objection_score,
+    language_score: scorecard.language_score,
+    close_score: scorecard.close_score,
+    did_close: scorecard.did_close,
+    flagged_for_review: scorecard.flagged_for_review,
+    ai_summary: scorecard.ai_summary,
+    overall_coaching: scorecard.overall_coaching || scorecard.coaching_note,
+    process_warning: scorecard.process_warning,
+    created_at: scorecard.created_at,
+    categories: [
+      {
+        key: "sitdown",
+        label: "Sit-down",
+        score: scorecard.sitdown_score,
+        explainer: scorecard.sitdown_score_explainer,
+        what_said: scorecard.sitdown_what_said,
+        what_to_say: scorecard.sitdown_what_to_say,
+        coaching: scorecard.sitdown_coaching,
+      },
+      {
+        key: "objection",
+        label: "Objections",
+        score: scorecard.objection_score,
+        explainer: scorecard.objection_score_explainer,
+        what_said: scorecard.objection_what_said,
+        what_to_say: scorecard.objection_what_to_say,
+        coaching: scorecard.objection_coaching,
+      },
+      {
+        key: "language",
+        label: "Language",
+        score: scorecard.language_score,
+        explainer: scorecard.language_score_explainer,
+        what_said: scorecard.language_what_said,
+        what_to_say: scorecard.language_what_to_say,
+        coaching: scorecard.language_coaching,
+      },
+      {
+        key: "close",
+        label: "Close",
+        score: scorecard.close_score,
+        explainer: scorecard.close_score_explainer,
+        what_said: scorecard.close_what_said,
+        what_to_say: scorecard.close_what_to_say,
+        coaching: scorecard.close_coaching,
+      },
+    ],
+  };
+}
 
 async function processRecording(
   recording_id,
