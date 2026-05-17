@@ -6,6 +6,8 @@ const WebSocket = require("ws");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
+const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 const {
   byCalendarId,
@@ -49,6 +51,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } });
 
 const tabletConnections = new Map();
+const recorderLocationAliases = new Map();
 
 wss.on("connection", (ws, req) => {
   console.log("[WS] New connection from " + req.socket.remoteAddress);
@@ -112,6 +115,103 @@ function triggerTablet(location_id, appointment_id, contact_name) {
   );
   console.log("[WS] Triggered tablet at " + location_id);
   return true;
+}
+
+function base64url(input) {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function decodeBase64url(value) {
+  let normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  while (normalized.length % 4) normalized += "=";
+  return Buffer.from(normalized, "base64").toString("utf8");
+}
+
+function timingSafeEqual(a, b) {
+  const left = Buffer.from(String(a || ""));
+  const right = Buffer.from(String(b || ""));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function verifyStaffToken(token) {
+  const secret = process.env.RECORDER_TOKEN_SECRET;
+  if (!secret) throw new Error("missing_recorder_token_secret");
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) throw new Error("malformed_recorder_token");
+  const [encodedHeader, encodedPayload, signature] = parts;
+  const header = JSON.parse(decodeBase64url(encodedHeader));
+  const payload = JSON.parse(decodeBase64url(encodedPayload));
+  if (header.alg !== "HS256" || header.typ !== "AIRA-RECORDER") {
+    throw new Error("unsupported_recorder_token");
+  }
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const expected = base64url(
+    crypto.createHmac("sha256", secret).update(signingInput).digest(),
+  );
+  if (!timingSafeEqual(signature, expected)) {
+    throw new Error("invalid_recorder_token_signature");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.iss !== "aira-api" || payload.aud !== "aira-backend") {
+    throw new Error("invalid_recorder_token_claims");
+  }
+  if (payload.nbf && now + 60 < payload.nbf) throw new Error("recorder_token_not_yet_valid");
+  if (!payload.exp || now - 60 > payload.exp) throw new Error("recorder_token_expired");
+  if (!["super_admin", "vp", "franchisee"].includes(payload.role)) {
+    throw new Error("recorder_token_role_denied");
+  }
+  return payload;
+}
+
+function normalizeLocationId(id) {
+  return String(id || "").toLowerCase().trim();
+}
+
+function resolveRecorderLocationId(id) {
+  const canonical = canonicalLocationId(id);
+  return recorderLocationAliases.get(normalizeLocationId(canonical)) || canonical;
+}
+
+function staffCanAccessLocation(req, locationId) {
+  const staff = req.staff;
+  if (!staff) return false;
+  if (staff.is_super) return true;
+  const resolved = resolveRecorderLocationId(locationId);
+  return (staff.location_ids || []).map(normalizeLocationId).includes(normalizeLocationId(resolved));
+}
+
+function ensureStaffLocationAccess(req, res, locationId) {
+  if (staffCanAccessLocation(req, locationId)) return true;
+  res.status(403).send("You do not have access to this gym's scorecards.");
+  return false;
+}
+
+function filterRecordingsForStaff(req, recordings) {
+  if (req.staff?.is_super) return recordings;
+  return (recordings || []).filter((recording) =>
+    staffCanAccessLocation(req, recording.location_id),
+  );
+}
+
+function filterScorecardsForRecordings(scorecards, recordings) {
+  const visibleIds = new Set((recordings || []).map((recording) => recording.recording_id));
+  return (scorecards || []).filter((scorecard) => visibleIds.has(scorecard.recording_id));
+}
+
+function staffTokenQuery(req) {
+  return req.staffToken ? `staff_token=${encodeURIComponent(req.staffToken)}` : "";
+}
+
+function withStaffToken(req, href) {
+  const tokenQuery = staffTokenQuery(req);
+  if (!tokenQuery) return href;
+  const sep = href.includes("?") ? "&" : "?";
+  return `${href}${sep}${tokenQuery}`;
 }
 
 app.post("/webhook/ghl", async (req, res) => {
@@ -181,7 +281,8 @@ async function processRecording(
   appointment_id,
   testOnly,
 ) {
-  const location = byLocationId[location_id] || {
+  const resolvedLocationId = resolveRecorderLocationId(location_id);
+  const location = byLocationId[resolvedLocationId] || {
     location_id: location_id || "unknown",
     franchise_name: "Walk-in / Unknown Location",
     franchisee_name: "Franchisee",
@@ -327,6 +428,28 @@ app.post("/admin/rescore/:id", async (req, res) => {
 // Default password "airafitness" — override by setting ADMIN_PASSWORD in Railway env.
 // Username is always "admin".
 function adminAuth(req, res, next) {
+  const token =
+    req.query.staff_token ||
+    (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (token && process.env.RECORDER_TOKEN_SECRET) {
+    try {
+      const payload = verifyStaffToken(token);
+      req.staffToken = token;
+      req.staff = {
+        email: payload.email,
+        name: payload.name,
+        role: payload.role,
+        location_ids: Array.isArray(payload.location_ids)
+          ? payload.location_ids.map(normalizeLocationId)
+          : [],
+        is_super: payload.role === "super_admin",
+      };
+      return next();
+    } catch (err) {
+      console.warn("[AdminAuth] staff token rejected:", err.message);
+    }
+  }
+
   const password = process.env.ADMIN_PASSWORD || "airafitness";
   const auth = req.headers.authorization || "";
   const [scheme, encoded] = auth.split(" ");
@@ -335,7 +458,16 @@ function adminAuth(req, res, next) {
     const idx = decoded.indexOf(":");
     const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
     const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
-    if (user === "admin" && pass === password) return next();
+    if (user === "admin" && pass === password) {
+      req.staff = {
+        email: "admin@local",
+        name: "Aira Admin",
+        role: "super_admin",
+        location_ids: [],
+        is_super: true,
+      };
+      return next();
+    }
   }
   res.set("WWW-Authenticate", 'Basic realm="Aira Admin"');
   return res.status(401).send("Authentication required");
@@ -453,8 +585,11 @@ function deltaHtml(current, prev, suffix = "", invert = false) {
 
 app.get("/admin", adminAuth, async (req, res) => {
   try {
-    const recordings = await db.getAllRecordings();
-    const scorecards = await db.getAllScorecards();
+    const recordings = filterRecordingsForStaff(req, await db.getAllRecordings());
+    const scorecards = filterScorecardsForRecordings(
+      await db.getAllScorecards(),
+      recordings,
+    );
     const scorecardMap = {};
     scorecards.forEach((s) => {
       scorecardMap[s.recording_id] = s;
@@ -607,7 +742,7 @@ app.get("/admin", adminAuth, async (req, res) => {
     // Aggregate by location_id, scoped to the selected period.
     const locStats = new Map();
     for (const r of recordingsInPeriod) {
-      const k = canonicalLocationId(r.location_id) || "unknown";
+      const k = resolveRecorderLocationId(r.location_id) || "unknown";
       if (!locStats.has(k)) {
         const meta = byLocationId[k] || {};
         locStats.set(k, {
@@ -798,7 +933,7 @@ app.get("/admin", adminAuth, async (req, res) => {
       const score = sc.total_score;
       const color =
         score >= 70 ? "#00AEEF" : score >= 50 ? "#0284C7" : "#DC2626";
-      return `<a href="/scorecard/${sc.recording_id}" target="_blank" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
+      return `<a href="${withStaffToken(req, `/scorecard/${sc.recording_id}`)}" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
     };
 
     const statusPill = (status) => {
@@ -825,7 +960,7 @@ app.get("/admin", adminAuth, async (req, res) => {
     const rows = recordingsInPeriod
       .map((r) => {
         const sc = scorecardMap[r.recording_id];
-        const loc = byLocationId[r.location_id] || {};
+        const loc = byLocationId[resolveRecorderLocationId(r.location_id)] || {};
         const name = r.contact_name || r.appointment_id;
         return `<tr>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDate(r.recorded_at)}</td>
@@ -834,7 +969,7 @@ app.get("/admin", adminAuth, async (req, res) => {
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDuration(r.duration_seconds)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${statusPill(r.processing_status)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${scorePill(sc)}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="/playback/${r.recording_id}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="${withStaffToken(req, `/playback/${r.recording_id}`)}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
       </tr>`;
       })
       .join("");
@@ -911,10 +1046,10 @@ tbody tr:hover{background:#F9FAFB;}
 <div class="subhead"><div class="subhead-inner">
   <div class="eyebrow">Consult Recorder</div>
   <div class="title">Admin Dashboard</div>
-  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="/admin/library" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; <a href="/admin/locations" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; <a href="/scoring" style="color:#00AEEF;font-weight:700;text-decoration:none;">How Scoring Works →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
+  <div class="subtitle">Live view of all consultation recordings and scoring &nbsp;·&nbsp; <a href="${withStaffToken(req, "/admin/library")}" style="color:#00AEEF;font-weight:700;text-decoration:none;">Training Library →</a> &nbsp;·&nbsp; ${req.staff?.is_super ? `<a href="${withStaffToken(req, "/admin/locations")}" style="color:#00AEEF;font-weight:700;text-decoration:none;">Locations →</a> &nbsp;·&nbsp; ` : ""}<a href="/scoring" style="color:#00AEEF;font-weight:700;text-decoration:none;">How Scoring Works →</a> &nbsp;·&nbsp; <a href="/practice" style="color:#00AEEF;font-weight:700;text-decoration:none;">Practice Bot →</a></div>
 </div></div>
 <div class="wrap">
-  ${rangeSelectorHtml(period.range, "/admin")}
+  ${rangeSelectorHtml(period.range, withStaffToken(req, "/admin"))}
   <div class="period-banner">Showing: <b>${period.label}</b>${showDeltas ? ` &nbsp;·&nbsp; <span style="color:#9CA3AF;">comparing ${period.prevLabel}</span>` : ""}</div>
 
   <div class="kpi-grid">
@@ -978,7 +1113,7 @@ tbody tr:hover{background:#F9FAFB;}
                 day: "numeric",
               })
             : "—";
-          const href = `/admin/location/${encodeURIComponent(l.location_id)}?range=${period.range}`;
+          const href = withStaffToken(req, `/admin/location/${encodeURIComponent(l.location_id)}?range=${period.range}`);
           return `<tr style="cursor:pointer;" onclick="window.location='${href}'" title="View ${l.franchise_name} dashboard">
           <td style="text-align:left;">
             <div style="font-size:13px;font-weight:700;color:#0284C7;">${l.franchise_name} <span style="color:#9CA3AF;font-weight:600;">→</span></div>
@@ -1074,6 +1209,7 @@ tbody tr:hover{background:#F9FAFB;}
 // ─────────── /admin/locations — add gyms without touching code ───────────
 
 app.get("/admin/locations", adminAuth, async (req, res) => {
+  if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
   const customs = await db.getCustomLocations();
   const allLocs = ALL_LOCATIONS.slice().sort((a, b) =>
     (a.franchise_name || "").localeCompare(b.franchise_name || ""),
@@ -1164,7 +1300,7 @@ tbody tr:hover{background:#F9FAFB;}
 </div></div>
 
 <div class="wrap">
-  <a href="/admin" class="back">← Back to Admin</a>
+  <a href="${withStaffToken(req, "/admin")}" class="back">← Back to Admin</a>
 
   ${flash}${flashDel}${flashErr}
 
@@ -1236,6 +1372,7 @@ app.post(
   express.urlencoded({ extended: true }),
   async (req, res) => {
     try {
+      if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
       const slug = String(req.body.location_id || "")
         .trim()
         .toLowerCase();
@@ -1295,6 +1432,7 @@ app.post(
 
 app.post("/admin/locations/delete/:id", adminAuth, async (req, res) => {
   try {
+    if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
     const slug = String(req.params.id).toLowerCase();
     const existing = byLocationId[slug];
     if (!existing || !existing._custom) {
@@ -1319,7 +1457,8 @@ app.post("/admin/locations/delete/:id", adminAuth, async (req, res) => {
 
 app.get("/admin/location/:id", adminAuth, async (req, res) => {
   try {
-    const slug = canonicalLocationId(req.params.id);
+    const slug = resolveRecorderLocationId(req.params.id);
+    if (!ensureStaffLocationAccess(req, res, slug)) return;
     const loc = byLocationId[slug] || {
       location_id: slug,
       franchise_name: slug,
@@ -1330,7 +1469,7 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
 
     // Filter to this location (canonicalize each recording to merge historical aliases).
     const recordingsAll = allRecordings.filter(
-      (r) => canonicalLocationId(r.location_id) === slug,
+      (r) => resolveRecorderLocationId(r.location_id) === slug,
     );
     const recordingIds = new Set(recordingsAll.map((r) => r.recording_id));
     const scorecards = allScorecards.filter((sc) =>
@@ -1589,7 +1728,7 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
       const score = sc.total_score;
       const color =
         score >= 70 ? "#00AEEF" : score >= 50 ? "#0284C7" : "#DC2626";
-      return `<a href="/scorecard/${sc.recording_id}" target="_blank" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
+      return `<a href="${withStaffToken(req, `/scorecard/${sc.recording_id}`)}" style="display:inline-block;padding:4px 10px;background:#fff;border:1.5px solid ${color};color:${color};border-radius:9999px;font-size:12px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${score}<span style="color:#9CA3AF;font-weight:600;"> / 100</span></a>`;
     };
     const statusPill = (status) => {
       const s = status || "pending";
@@ -1623,7 +1762,7 @@ app.get("/admin/location/:id", adminAuth, async (req, res) => {
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDuration(r.duration_seconds)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${statusPill(r.processing_status)}</td>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;">${scorePill(sc)}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="/playback/${r.recording_id}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;">${r.audio_file_url ? `<a href="${withStaffToken(req, `/playback/${r.recording_id}`)}" style="color:#0284C7;text-decoration:none;font-weight:600;">▶ Play</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
       </tr>`;
       })
       .join("");
@@ -1706,9 +1845,9 @@ tbody tr:hover{background:#F9FAFB;}
 </div></div>
 
 <div class="wrap">
-  <a href="/admin" class="back">← Back to all locations</a>
+  <a href="${withStaffToken(req, "/admin")}" class="back">← Back to all locations</a>
 
-  ${rangeSelectorHtml(period.range, `/admin/location/${encodeURIComponent(slug)}`)}
+  ${rangeSelectorHtml(period.range, withStaffToken(req, `/admin/location/${encodeURIComponent(slug)}`))}
   <div class="period-banner">Showing: <b>${period.label}</b>${showDeltas ? ` &nbsp;·&nbsp; <span style="color:#9CA3AF;">comparing ${period.prevLabel}</span>` : ""}</div>
 
   <div class="kpi-grid">
@@ -1797,8 +1936,11 @@ tbody tr:hover{background:#F9FAFB;}
 
 app.get("/admin/library", adminAuth, async (req, res) => {
   try {
-    const recordings = await db.getAllRecordings();
-    const scorecards = await db.getAllScorecards();
+    const recordings = filterRecordingsForStaff(req, await db.getAllRecordings());
+    const scorecards = filterScorecardsForRecordings(
+      await db.getAllScorecards(),
+      recordings,
+    );
     const latestByRec = new Map();
     for (const sc of scorecards) {
       const prev = latestByRec.get(sc.recording_id);
@@ -1900,7 +2042,7 @@ app.get("/admin/library", adminAuth, async (req, res) => {
       if (!rec.transcript) continue;
       const sc = latestByRec.get(rec.recording_id);
       if (!sc) continue;
-      const loc = byLocationId[rec.location_id] || {};
+      const loc = byLocationId[resolveRecorderLocationId(rec.location_id)] || {};
       for (const b of buckets) {
         for (const p of b.patterns) {
           const m = rec.transcript.match(p);
@@ -1943,7 +2085,7 @@ app.get("/admin/library", adminAuth, async (req, res) => {
         month: "short",
         day: "numeric",
       });
-      return `<a href="/scorecard/${h.recording_id}" target="_blank" style="display:block;text-decoration:none;color:inherit;">
+      return `<a href="${withStaffToken(req, `/scorecard/${h.recording_id}`)}" style="display:block;text-decoration:none;color:inherit;">
         <div class="pair-card" style="border-left:4px solid ${accent};">
           <div class="pair-head">
             <div class="pair-label" style="color:${accent};">${label}</div>
@@ -1997,7 +2139,7 @@ a{color:#0284C7;}
   <div class="subtitle">For each common objection, see one rep who closed it and one who didn't. Pulled from real recordings.</div>
 </div></div>
 <div class="wrap">
-  <a href="/admin" class="back">← Back to Admin</a>
+  <a href="${withStaffToken(req, "/admin")}" class="back">← Back to Admin</a>
   <div class="intro"><b>How to use:</b> Pick an objection. Read the closed example, read the no-sale example. Notice what changed between them. Click any card to see the full transcript and coaching note.</div>
   ${
     sections.length === 0
@@ -4382,6 +4524,7 @@ app.get("/scorecard/:id", adminAuth, async (req, res) => {
   try {
     const r = await db.getRecording(req.params.id);
     if (!r) return res.status(404).send("Recording not found");
+    if (!ensureStaffLocationAccess(req, res, r.location_id)) return;
     const s = await db.getScorecardByRecording(req.params.id);
     if (!s)
       return res
@@ -4389,8 +4532,7 @@ app.get("/scorecard/:id", adminAuth, async (req, res) => {
         .send(
           "Scorecard not yet available — check back after processing completes.",
         );
-    const { byLocationId } = require("./locations");
-    const loc = byLocationId[r.location_id] || {};
+    const loc = byLocationId[resolveRecorderLocationId(r.location_id)] || {};
     const name = r.contact_name || r.appointment_id;
     const date = new Date(r.recorded_at).toLocaleDateString("en-US", {
       timeZone: "America/Chicago",
@@ -4470,7 +4612,7 @@ a{color:#0284C7;}
   <div class="subtitle">${date} &nbsp;·&nbsp; ${name} &nbsp;·&nbsp; ${Math.round(r.duration_seconds / 60)}m ${r.duration_seconds % 60}s</div>
 </div></div>
 <div class="wrap">
-  <a href="/admin" class="back">← Back to Admin</a>
+  <a href="${withStaffToken(req, "/admin")}" class="back">← Back to Admin</a>
   ${s.flagged_for_review ? '<div class="flag">⚠ Flagged for Review</div>' : ""}
   <div class="card score-card">
     <div class="score-label">Overall Score</div>
@@ -4511,8 +4653,9 @@ a{color:#0284C7;}
 app.get("/playback/:recording_id", adminAuth, async (req, res) => {
   const rec = await db.getRecording(req.params.recording_id);
   if (!rec || !rec.audio_file_url) return res.status(404).send("Not found");
+  if (!ensureStaffLocationAccess(req, res, rec.location_id)) return;
   const name = rec.contact_name || rec.appointment_id;
-  const loc = byLocationId[rec.location_id] || {};
+  const loc = byLocationId[resolveRecorderLocationId(rec.location_id)] || {};
   const dt = new Date(rec.recorded_at).toLocaleString("en-US", {
     timeZone: "America/Chicago",
   });
@@ -4542,7 +4685,7 @@ audio{width:100%;}
   <div class="subtitle">${loc.franchise_name || rec.location_id} &nbsp;·&nbsp; ${dt}</div>
 </div></div>
 <div class="wrap">
-  <a href="/admin" class="back">← Back to Admin</a>
+  <a href="${withStaffToken(req, "/admin")}" class="back">← Back to Admin</a>
   <div class="card">
     <div class="section-title">Audio</div>
     <audio controls><source src="/audio/${path.basename(rec.audio_file_url)}"></audio>
@@ -4590,6 +4733,63 @@ app.post("/test/trigger", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+function registerLocation(loc, aliases = []) {
+  if (!loc?.location_id) return;
+  const locationId = normalizeLocationId(loc.location_id);
+  const normalized = { ...loc, location_id: locationId };
+  byLocationId[locationId] = normalized;
+  recorderLocationAliases.set(locationId, locationId);
+
+  for (const alias of aliases || []) {
+    const normalizedAlias = normalizeLocationId(alias);
+    if (!normalizedAlias) continue;
+    byLocationId[normalizedAlias] = normalized;
+    recorderLocationAliases.set(normalizedAlias, locationId);
+    const aliasIdx = ALL_LOCATIONS.findIndex(
+      (x) => normalizeLocationId(x.location_id) === normalizedAlias && normalizedAlias !== locationId,
+    );
+    if (aliasIdx >= 0) ALL_LOCATIONS.splice(aliasIdx, 1);
+  }
+
+  const existingIdx = ALL_LOCATIONS.findIndex(
+    (x) => normalizeLocationId(x.location_id) === locationId,
+  );
+  if (existingIdx >= 0) ALL_LOCATIONS[existingIdx] = normalized;
+  else ALL_LOCATIONS.push(normalized);
+}
+
+async function syncAcsmLocations() {
+  const secret = process.env.RECORDER_SYNC_SECRET;
+  const apiBase = process.env.AIRA_API_BASE_URL || "https://api.airafitness.com";
+  if (!secret) {
+    console.log("[ACSM Locations] RECORDER_SYNC_SECRET not configured; skipping sync");
+    return;
+  }
+  try {
+    const { data } = await axios.get(`${apiBase}/internal/recorder/locations`, {
+      headers: { "X-Aira-Internal-Secret": secret },
+      timeout: 10000,
+    });
+    const locations = Array.isArray(data?.locations) ? data.locations : [];
+    for (const row of locations) {
+      registerLocation(
+        {
+          location_id: row.location_id || row.id,
+          franchise_name: row.franchise_name || row.name || row.id,
+          franchisee_name: "",
+          franchisee_email: row.club_email || process.env.MIKE_EMAIL || "mikebell@airafitness.com",
+          club_email: row.club_email || "",
+          _acsm: true,
+        },
+        row.legacy_location_ids || [],
+      );
+    }
+    console.log(`[ACSM Locations] Synced ${locations.length} ACSM location(s)`);
+  } catch (err) {
+    console.error("[ACSM Locations] sync failed:", err.message);
+  }
+}
+
 // Merge any custom locations (added via /admin/locations) into the in-memory maps.
 // Called at startup AND after each add/delete so changes propagate without restart.
 async function loadCustomLocations() {
@@ -4606,11 +4806,8 @@ async function loadCustomLocations() {
         ghl_calendar_id: c.ghl_calendar_id || "",
         _custom: true,
       };
-      byLocationId[loc.location_id] = loc;
+      registerLocation(loc);
       if (loc.ghl_calendar_id) byCalendarId[loc.ghl_calendar_id] = loc;
-      if (!ALL_LOCATIONS.find((x) => x.location_id === loc.location_id)) {
-        ALL_LOCATIONS.push(loc);
-      }
     }
     console.log(`[Locations] Loaded ${customs.length} custom location(s)`);
   } catch (err) {
@@ -4631,6 +4828,8 @@ function removeCustomLocationFromCache(location_id) {
 initDb()
   .then(async () => {
     await loadCustomLocations();
+    await syncAcsmLocations();
+    setInterval(syncAcsmLocations, 15 * 60 * 1000).unref();
     await runReaper();
     server.listen(PORT, () => {
       console.log("Aira backend running on port " + PORT);
