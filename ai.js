@@ -2,6 +2,7 @@
 const axios = require("axios");
 const FormData = require("form-data");
 const fs = require("fs");
+const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
 const db = require("./db");
 const { sendScorecardEmail } = require("./email");
@@ -350,9 +351,10 @@ TRANSCRIPT:
 async function transcribeAudio(audioFilePath) {
   console.log(`[AI] Transcribing ${audioFilePath}...`);
   const form = new FormData();
+  const { filename, contentType } = audioUploadInfo(audioFilePath);
   form.append("file", fs.createReadStream(audioFilePath), {
-    filename: "recording.webm",
-    contentType: "audio/webm",
+    filename,
+    contentType,
   });
   form.append("model", "whisper-1");
   form.append("language", "en");
@@ -371,6 +373,20 @@ async function transcribeAudio(audioFilePath) {
     `[AI] Transcription complete: ${response.data.text.length} chars`,
   );
   return response.data.text;
+}
+
+function audioUploadInfo(audioFilePath) {
+  const ext = path.extname(audioFilePath || "").toLowerCase();
+  if (ext === ".m4a" || ext === ".mp4") {
+    return { filename: `recording${ext || ".m4a"}`, contentType: "audio/mp4" };
+  }
+  if (ext === ".mp3" || ext === ".mpeg" || ext === ".mpga") {
+    return { filename: `recording${ext}`, contentType: "audio/mpeg" };
+  }
+  if (ext === ".wav") {
+    return { filename: "recording.wav", contentType: "audio/wav" };
+  }
+  return { filename: "recording.webm", contentType: "audio/webm" };
 }
 
 async function scoreTranscript(transcript) {

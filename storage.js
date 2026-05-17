@@ -45,7 +45,7 @@ async function uploadToR2(localFilePath, recordingId) {
     Bucket: bucket,
     Key: key,
     Body: fileBuffer,
-    ContentType: 'audio/webm'
+    ContentType: contentTypeForAudioPath(localFilePath)
   }));
 
   console.log(`[R2] Uploaded ${key} to bucket ${bucket}`);
@@ -72,3 +72,11 @@ async function getPresignedUrl(r2Key, linkExpirySeconds = 60 * 60 * 24 * 7) {
 }
 
 module.exports = { uploadToR2, getPresignedUrl };
+
+function contentTypeForAudioPath(filePath) {
+  const ext = path.extname(filePath || '').toLowerCase();
+  if (ext === '.m4a' || ext === '.mp4') return 'audio/mp4';
+  if (ext === '.mp3' || ext === '.mpeg' || ext === '.mpga') return 'audio/mpeg';
+  if (ext === '.wav') return 'audio/wav';
+  return 'audio/webm';
+}

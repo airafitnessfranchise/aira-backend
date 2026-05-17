@@ -45,13 +45,25 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
 const storage = multer.diskStorage({
   destination: UPLOAD_DIR,
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + uuidv4() + ".webm");
+    cb(null, Date.now() + "-" + uuidv4() + audioExtensionForUpload(file));
   },
 });
 const upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } });
 
 const tabletConnections = new Map();
 const recorderLocationAliases = new Map();
+
+function audioExtensionForUpload(file) {
+  const fromName = path.extname(file?.originalname || "").toLowerCase();
+  if ([".m4a", ".mp4", ".webm", ".mp3", ".wav", ".mpeg", ".mpga"].includes(fromName)) {
+    return fromName;
+  }
+  const mime = String(file?.mimetype || "").toLowerCase();
+  if (mime.includes("mp4") || mime.includes("m4a") || mime.includes("aac")) return ".m4a";
+  if (mime.includes("mpeg") || mime.includes("mp3")) return ".mp3";
+  if (mime.includes("wav")) return ".wav";
+  return ".webm";
+}
 
 wss.on("connection", (ws, req) => {
   console.log("[WS] New connection from " + req.socket.remoteAddress);
@@ -179,7 +191,7 @@ function signRecordingResultToken(recording) {
     sub: recording.recording_id,
     location_id: recording.location_id || "unknown",
     iat: now,
-    exp: now + 60 * 60 * 6,
+    exp: now + 60 * 60 * 24 * 7,
   };
   const encodedHeader = base64url(JSON.stringify(header));
   const encodedPayload = base64url(JSON.stringify(payload));
