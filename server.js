@@ -367,6 +367,7 @@ app.get("/recording-result/:id", async (req, res) => {
         duration_seconds: recording.duration_seconds || 0,
         recorded_at: recording.recorded_at,
         processing_status: recording.processing_status,
+        transcript: recording.transcript || "",
       },
       scorecard: scorecard ? publicScorecard(scorecard) : null,
     });
