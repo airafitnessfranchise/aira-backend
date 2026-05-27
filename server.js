@@ -2497,9 +2497,9 @@ app.post("/practice/voice/session", async (req, res) => {
                 transcription: { model: "whisper-1" },
                 turn_detection: {
                   type: "server_vad",
-                  threshold: 0.5,
+                  threshold: 0.7,
                   prefix_padding_ms: 300,
-                  silence_duration_ms: 600,
+                  silence_duration_ms: 900,
                 },
               },
               output: { voice },
@@ -4587,7 +4587,7 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
             <input id="voice-mode" type="checkbox" />
             <span class="ct-body">
               <span class="ct-title">🎙️ Voice Mode <span class="ct-new">NEW</span></span>
-              Speak to the prospect out loud like a real consult. Your mic feeds the AI, the prospect speaks back. Closest thing to the actual floor. Coached hints not available in voice mode yet — coming soon.
+              Speak to the prospect out loud like a real consult. Your mic feeds the AI, the prospect speaks back. <b style="color:#FBBF24;">Use headphones</b> — phone speakers cause echo that confuses the AI. Coached hints not available in voice mode yet — coming soon.
             </span>
           </label>
           <button class="cta" id="start-btn">Start Consult →</button>
@@ -4776,9 +4776,18 @@ function voiceAppendMessage(role, content) {
 async function startVoiceConsult({ difficulty, location_id }) {
   voiceSetStatus('Requesting microphone…', null);
   // 1. Request mic FIRST so the user grants permission before we burn an OpenAI session.
+  // Echo cancellation + noise suppression are critical on phone speakers — otherwise the
+  // prospect's voice plays through the speaker, gets picked up by the mic, and Whisper
+  // transcribes it as user input (= the AI talks to itself in a loop).
   let micStream;
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
   } catch (err) {
     throw new Error('Microphone access denied. Voice mode needs your mic.');
   }
@@ -4807,10 +4816,18 @@ async function startVoiceConsult({ difficulty, location_id }) {
   const pc = new RTCPeerConnection();
   VOICE_PC = pc;
 
-  // Remote audio element for the prospect's voice.
+  // Remote audio element for the prospect's voice. Must be in the DOM for iOS Safari
+  // to actually play the stream. Use playsinline + muted=false; user gesture already
+  // happened via the Start button so autoplay is allowed.
   VOICE_AUDIO_EL = document.createElement('audio');
   VOICE_AUDIO_EL.autoplay = true;
-  pc.ontrack = (e) => { VOICE_AUDIO_EL.srcObject = e.streams[0]; };
+  VOICE_AUDIO_EL.setAttribute('playsinline', '');
+  VOICE_AUDIO_EL.style.display = 'none';
+  document.body.appendChild(VOICE_AUDIO_EL);
+  pc.ontrack = (e) => {
+    VOICE_AUDIO_EL.srcObject = e.streams[0];
+    VOICE_AUDIO_EL.play().catch((err) => console.warn('[Voice] audio play err:', err));
+  };
 
   // Send our mic.
   micStream.getTracks().forEach((track) => pc.addTrack(track, micStream));
@@ -4850,26 +4867,29 @@ async function startVoiceConsult({ difficulty, location_id }) {
 
 function handleVoiceEvent(ev) {
   const t = ev.type || '';
-  // Prospect started speaking
-  if (t === 'response.audio.delta' || t === 'response.audio_transcript.delta' || t === 'output_audio_buffer.started') {
+  if (t !== 'response.output_audio.delta' && t !== 'response.output_audio_transcript.delta') {
+    console.log('[Voice ev]', t);
+  }
+  // Prospect started speaking — GA event name is response.output_audio.delta
+  if (t === 'response.output_audio.delta' || t === 'response.output_audio_transcript.delta') {
     voiceSetStatus(($('voice-persona-label').textContent.split('—').pop() || 'Prospect').trim() + ' speaking…', 'speaking');
   }
-  // User speech detected
+  // User speech detected via server VAD
   if (t === 'input_audio_buffer.speech_started') {
     voiceSetStatus('You are speaking…', 'listening');
   }
   if (t === 'input_audio_buffer.speech_stopped') {
-    voiceSetStatus('Listening…', 'listening');
+    voiceSetStatus('Thinking…', null);
   }
-  // Capture user transcript (Whisper)
+  // Capture user transcript (Whisper). GA preserves the beta event name here.
   if (t === 'conversation.item.input_audio_transcription.completed') {
     if (ev.transcript) voiceAppendMessage('user', ev.transcript);
   }
-  // Capture assistant text — Realtime API emits these per-response.
-  if (t === 'response.audio_transcript.delta' && ev.delta) {
+  // Capture assistant transcript — GA renamed audio_transcript to output_audio_transcript.
+  if (t === 'response.output_audio_transcript.delta' && ev.delta) {
     VOICE_PENDING_ASSISTANT += ev.delta;
   }
-  if (t === 'response.audio_transcript.done') {
+  if (t === 'response.output_audio_transcript.done') {
     const finalText = (ev.transcript || VOICE_PENDING_ASSISTANT || '').trim();
     if (finalText) voiceAppendMessage('assistant', finalText);
     VOICE_PENDING_ASSISTANT = '';
