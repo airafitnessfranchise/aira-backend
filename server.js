@@ -2475,28 +2475,39 @@ app.post("/practice/voice/session", async (req, res) => {
     const instructions = buildVoiceInstructions(scenario);
     const model = "gpt-realtime";
 
-    // Mint the ephemeral key from OpenAI. Valid for ~1 minute, used once for the
-    // WebRTC handshake. After the SDP exchange, the connection survives without it.
-    const oaResp = await fetch("https://api.openai.com/v1/realtime/sessions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        voice,
-        instructions,
-        modalities: ["audio", "text"],
-        input_audio_transcription: { model: "whisper-1" },
-        turn_detection: {
-          type: "server_vad",
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 600,
+    // Mint the ephemeral key from OpenAI Realtime GA. The beta /sessions endpoint
+    // was retired (Nov 2025); GA uses /client_secrets with a nested session config
+    // where voice/transcription/VAD live under audio.input/audio.output.
+    const oaResp = await fetch(
+      "https://api.openai.com/v1/realtime/client_secrets",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          session: {
+            type: "realtime",
+            model,
+            instructions,
+            output_modalities: ["audio"],
+            audio: {
+              input: {
+                transcription: { model: "whisper-1" },
+                turn_detection: {
+                  type: "server_vad",
+                  threshold: 0.5,
+                  prefix_padding_ms: 300,
+                  silence_duration_ms: 600,
+                },
+              },
+              output: { voice },
+            },
+          },
+        }),
+      },
+    );
     if (!oaResp.ok) {
       const txt = await oaResp.text();
       console.error(
@@ -2508,8 +2519,8 @@ app.post("/practice/voice/session", async (req, res) => {
         .status(502)
         .json({ ok: false, error: "OpenAI session error: " + txt });
     }
-    const session = await oaResp.json();
-    const ephemeral_key = session?.client_secret?.value;
+    const data = await oaResp.json();
+    const ephemeral_key = data?.value;
     if (!ephemeral_key)
       return res
         .status(502)
