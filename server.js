@@ -4829,7 +4829,7 @@ async function startVoiceConsult({ difficulty, location_id }) {
   // 4. SDP handshake with OpenAI Realtime.
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const sdpResp = await fetch('https://api.openai.com/v1/realtime?model=' + encodeURIComponent(r.model), {
+  const sdpResp = await fetch('https://api.openai.com/v1/realtime/calls?model=' + encodeURIComponent(r.model), {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + r.ephemeral_key,
