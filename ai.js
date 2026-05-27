@@ -745,6 +745,27 @@ If the rep handles you cleanly with EITHER play, you CLOSE at the single ($59) t
 
 RULES: Stay in character. 1-2 sentences max. Friendly, direct, light. Output only what Kayla says.`,
       },
+      {
+        id: "logan-friend",
+        name: "Logan",
+        opening:
+          "Hey, gym looks good. So what's a membership cost? I might check with my buddy to see if he wants to do this with me.",
+        systemPrompt: `You are role-playing as Logan, 27. You walked in solo, but you've been talking to a friend about joining a gym together. You're interested for yourself, but you want to see if your buddy will commit too before you do. The friend deferral is real — not cover for something else. This persona tests the Aira "friend objection" script: the action-taker framing + 50% off coupon now + bonus month if the friend joins later.
+
+BEHAVIOR:
+- Open by asking about price + mentioning the friend.
+- Engage with the sit-down ("yep", "okay", "makes sense").
+- When the rep delivers the assumptive close ("which one would you like to get started with today?"), surface the friend deferral: "Sounds good, but let me check with my buddy first to see if he wants to join."
+- If the rep just says "okay, bring him in for a tour" or "come back when you've talked to him" — you leave politely. You don't come back. ("Sounds good, I'll let you know.")
+- The CORRECT close has TWO parts (script: 5-Day Training v10):
+  1. "If your friend didn't end up wanting to join, would you still be interested for yourself?" → answer honestly: "Yeah, probably."
+  2. The action-taker framing: "Cool — I'm gonna hook you up since you're the action taker. 50% off enrollment right now, and if your friend joins later, I'll give you a free month. Is that fair?" → CLOSES you. ("Oh, that's actually cool, yeah let's do it.")
+- If the rep only does part 1 (the "if your friend didn't" question) without the action-taker hook, you stay hesitant: "yeah I mean I'd still want to but let me still talk to him first."
+- If the rep just throws a Coupon Drop without the action-taker framing, you appreciate the gesture but you still want to wait for your friend.
+- You DO NOT have cost concerns. You DO NOT have trust concerns. The single test is whether the rep handles the friend objection with the script's specific close.
+
+RULES: Stay in character. 1-2 sentences max. Casual, friendly, easy-going. Output only what Logan says.`,
+      },
     ],
   },
 
@@ -1156,7 +1177,12 @@ const GAME_LEVELS = [
     description:
       "Payment-timing. Accountability framing. Closing without giving away revenue.",
     color: "#7C3AED",
-    scenarios: ["daniela-singlemom", "cassie-pricepic", "kayla-trialseeker"],
+    scenarios: [
+      "daniela-singlemom",
+      "cassie-pricepic",
+      "kayla-trialseeker",
+      "logan-friend",
+    ],
   },
   {
     level: 5,
@@ -1225,6 +1251,86 @@ OPENING:
   return TOUR_FICTION + "\n\n" + scenario.systemPrompt + "\n\n" + voiceDelivery;
 }
 
+// ─────────── SKILL DRILLS ───────────
+// Curated objection-type pools so franchisees can drill a specific weakness
+// instead of taking whatever the difficulty bucket randomly serves them. Each
+// drill maps to one or more personas that test that exact objection type;
+// /practice picks a random persona from the chosen drill's pool at start.
+const SKILL_DRILLS = [
+  {
+    id: "spouse",
+    label: "Spouse / Partner Says No",
+    icon: "👫",
+    description:
+      'They want to "talk to my husband / wife first." Drill the "if they didn\'t want to, would you still be interested?" close + free-pass-on-account.',
+    scenarios: ["diane-spouse", "deshawn-couple"],
+  },
+  {
+    id: "friend",
+    label: "Friend Hasn't Decided",
+    icon: "🤝",
+    description:
+      'They want to check with a friend before signing. Drill the "you\'re the action taker" framing + 50% off + bonus month if the friend joins later.',
+    scenarios: ["logan-friend"],
+  },
+  {
+    id: "trial-seeker",
+    label: "Just Wants the 7-Day Trial",
+    icon: "🎟️",
+    description:
+      "Walked in for the free trial, not to sign up. Drill the $25 activation hook + By The Way close to convert the trial into a paid signup.",
+    scenarios: ["kayla-trialseeker"],
+  },
+  {
+    id: "another-gym",
+    label: "Already at Another Gym / Shopping",
+    icon: "🏋️",
+    description:
+      "They have an existing membership or are comparing gyms. Drill the Deaf Ear → Coupon Drop or payment-timing solution for overlap.",
+    scenarios: ["brandon-comparing", "jessica-comparing", "anthony-pfworker"],
+  },
+  {
+    id: "cost-upfront",
+    label: "Can't Afford the Upfront Today",
+    icon: "💸",
+    description:
+      "Upfront cost feels heavy or they don't get paid until later this week. Drill Deaf Ear → Coupon Drop OR payment-timing close.",
+    scenarios: ["mike-construction", "daniela-singlemom", "aaron-justlooking"],
+  },
+  {
+    id: "photo-walkout",
+    label: "Wants to Take a Picture / Walk Out",
+    icon: "📸",
+    description:
+      "The classic walk-out signal — they're about to leave with a photo of the prices. Drill recognizing it and running the close NOW.",
+    scenarios: ["cassie-pricepic"],
+  },
+  {
+    id: "trust",
+    label: "Trust / Been Burned Before",
+    icon: "🛡️",
+    description:
+      'Got hit with a $300 cancellation fee at another gym. Drill the trust rebuild via the sit-down structure ("first + last upfront so you\'re done when you cancel") without trashing competitors.',
+    scenarios: ["vanessa-burned"],
+  },
+  {
+    id: "short-stay",
+    label: "Moving / Short-Term Stay",
+    icon: "✈️",
+    description:
+      'Possible relocation soon, won\'t commit long. Drill the sit-down so "no contracts, cancel anytime" automatically resolves their concern.',
+    scenarios: ["marco-moving"],
+  },
+  {
+    id: "employer-pays",
+    label: "Employer Pays / Needs Boss Approval",
+    icon: "💼",
+    description:
+      "Company card or wellness benefit, needs boss sign-off. Drill the email-invoice-to-boss conversion play instead of letting them walk with a photo.",
+    scenarios: ["tyler-corporate"],
+  },
+];
+
 module.exports = {
   transcribeAudio,
   scoreTranscript,
@@ -1238,4 +1344,5 @@ module.exports = {
   findScenarioById,
   voiceForPersona,
   buildVoiceInstructions,
+  SKILL_DRILLS,
 };

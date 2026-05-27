@@ -28,6 +28,7 @@ const {
   findScenarioById,
   voiceForPersona,
   buildVoiceInstructions,
+  SKILL_DRILLS,
 } = require("./ai");
 const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
@@ -4322,6 +4323,18 @@ app.get("/practice", (req, res) => {
         `<option value="${k}"${k === "medium" ? " selected" : ""}>${p.label} — ${p.description}</option>`,
     )
     .join("");
+  const drillOptions =
+    '<option value="">🎯 Random (based on difficulty above)</option>' +
+    SKILL_DRILLS.map(
+      (d) => `<option value="${d.id}">${d.icon} ${d.label}</option>`,
+    ).join("");
+  // Serialize the drill→scenario map for the client picker to do random selection.
+  const drillScenarioMapJson = JSON.stringify(
+    Object.fromEntries(SKILL_DRILLS.map((d) => [d.id, d.scenarios])),
+  );
+  const drillDescriptionsJson = JSON.stringify(
+    Object.fromEntries(SKILL_DRILLS.map((d) => [d.id, d.description])),
+  );
 
   res.send(`<!DOCTYPE html><html><head><title>Aira Practice — Objection Bot</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -4405,6 +4418,8 @@ label.fld select{
 }
 label.fld select:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.06);}
 label.fld select option{background:#0A0F1E;color:#fff;}
+.fld-help{font-size:12px;color:#9CA3AF;margin-top:8px;line-height:1.5;padding:8px 12px;background:rgba(124,58,237,0.06);border-left:2px solid rgba(124,58,237,0.4);border-radius:6px;display:none;}
+.fld-help.show{display:block;}
 
 .coach-toggle{
   display:flex !important;align-items:flex-start;gap:12px;padding:16px;
@@ -4576,6 +4591,10 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
           <label class="fld"><span>Your Gym</span>
             <select id="location"><option value="">— Select your gym —</option>${locOptions}</select>
           </label>
+          <label class="fld"><span>🎯 Skill Focus (optional)</span>
+            <select id="skill-drill">${drillOptions}</select>
+            <div id="skill-drill-desc" class="fld-help"></div>
+          </label>
           <label class="coach-toggle">
             <input id="coach-mode" type="checkbox" />
             <span class="ct-body">
@@ -4639,6 +4658,35 @@ let COACH_MODE = false;
 const QUERY_PARAMS = new URLSearchParams(window.location.search);
 const EMBED_MODE = QUERY_PARAMS.get('embed') === '1';
 const PLAYER_NAME = (QUERY_PARAMS.get('name') || '').trim();
+
+// Skill drill data injected from the server. Map of drill_id → scenario_id[] and
+// drill_id → human-readable description. Used to pick a random persona when the
+// user opts into a specific objection drill instead of a random difficulty pick.
+const DRILL_SCENARIOS = ${drillScenarioMapJson};
+const DRILL_DESCRIPTIONS = ${drillDescriptionsJson};
+
+function drillRandomScenarioId(drillId) {
+  const pool = DRILL_SCENARIOS[drillId];
+  if (!pool || !pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Show the description for the picked drill + dim the difficulty selector
+// (it's overridden when a specific scenario is forced).
+$('skill-drill').addEventListener('change', () => {
+  const id = $('skill-drill').value;
+  const desc = $('skill-drill-desc');
+  if (id && DRILL_DESCRIPTIONS[id]) {
+    desc.textContent = DRILL_DESCRIPTIONS[id];
+    desc.classList.add('show');
+    $('difficulty').style.opacity = '0.4';
+    $('difficulty').disabled = true;
+  } else {
+    desc.classList.remove('show');
+    $('difficulty').style.opacity = '';
+    $('difficulty').disabled = false;
+  }
+});
 
 function applyEmbedMode(){
   if (EMBED_MODE) document.body.classList.add('embed-mode');
@@ -4717,12 +4765,16 @@ $('start-btn').onclick = async () => {
   const location_id = $('location').value;
   const coach_mode = $('coach-mode').checked;
   const voice_mode = $('voice-mode').checked;
+  const drill_id = $('skill-drill').value;
+  // When the user picks a skill drill, randomly select a persona from that
+  // drill's pool. The backend will honor scenario_id and skip its difficulty picker.
+  const forced_scenario_id = drill_id ? drillRandomScenarioId(drill_id) : null;
   if (!location_id) { alert('Please select your gym'); return; }
   $('start-btn').disabled = true;
   $('start-btn').textContent = 'Starting…';
   if (voice_mode) {
     try {
-      await startVoiceConsult({ difficulty, location_id });
+      await startVoiceConsult({ difficulty, location_id, scenario_id: forced_scenario_id });
     } catch (err) {
       alert('Voice mode error: ' + (err.message || err));
       $('start-btn').disabled = false;
@@ -4730,7 +4782,7 @@ $('start-btn').onclick = async () => {
     }
     return;
   }
-  const r = await postJson('/practice/start', { difficulty, location_id, coach_mode, player_name: PLAYER_NAME || null });
+  const r = await postJson('/practice/start', { difficulty, location_id, coach_mode, scenario_id: forced_scenario_id, player_name: PLAYER_NAME || null });
   if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
   SESSION_ID = r.session_id;
   SCENARIO_ID = r.scenario_id || '';
@@ -4773,7 +4825,7 @@ function voiceAppendMessage(role, content) {
   $('voice-messages').scrollTop = $('voice-messages').scrollHeight;
 }
 
-async function startVoiceConsult({ difficulty, location_id }) {
+async function startVoiceConsult({ difficulty, location_id, scenario_id }) {
   voiceSetStatus('Requesting microphone…', null);
   // 1. Request mic FIRST so the user grants permission before we burn an OpenAI session.
   // Echo cancellation + noise suppression are critical on phone speakers — otherwise the
@@ -4796,7 +4848,7 @@ async function startVoiceConsult({ difficulty, location_id }) {
   // 2. Mint ephemeral OpenAI session on the server.
   voiceSetStatus('Starting session…', null);
   const r = await postJson('/practice/voice/session', {
-    difficulty, location_id, player_name: PLAYER_NAME || null,
+    difficulty, location_id, scenario_id: scenario_id || null, player_name: PLAYER_NAME || null,
   });
   if (!r.ok) {
     micStream.getTracks().forEach((t) => t.stop());
