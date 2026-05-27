@@ -4920,6 +4920,7 @@ function cleanupVoice() {
 }
 
 $('voice-end-btn').onclick = async () => {
+  if ($('voice-end-btn').disabled) return;
   $('voice-end-btn').disabled = true;
   $('voice-end-btn').textContent = 'Scoring…';
   voiceSetStatus('Ending call…', null);
@@ -4930,15 +4931,21 @@ $('voice-end-btn').onclick = async () => {
     $('voice-end-btn').textContent = 'End & Score';
     return;
   }
+  // Mirror the text-mode end flow: hide the call view, show the score view with
+  // a "Scoring…" placeholder, then let renderScorecard fill it in once /end returns.
+  $('voice').classList.add('hidden');
+  $('score').classList.remove('hidden');
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID, messages: VOICE_TRANSCRIPT });
-    if (!r.ok) throw new Error(r.error || 'Score request failed');
-    $('voice').classList.add('hidden');
+    if (!r.ok) {
+      $('score').innerHTML = '<div class="celebration fail"><h2>Couldn\\'t score</h2><p class="sub">' + (r.error || 'Unknown error') + '</p><div class="btn-row" style="justify-content:center;"><button class="cta secondary" onclick="location.reload()">Start Over</button></div></div>';
+      return;
+    }
+    rememberScenario(r.scenario_id || SCENARIO_ID);
     renderScorecard(r.scorecard, r.messages);
   } catch (err) {
-    alert('Scoring failed: ' + err.message);
-    $('voice-end-btn').disabled = false;
-    $('voice-end-btn').textContent = 'End & Score';
+    $('score').innerHTML = '<div class="celebration fail"><h2>Connection Error</h2><p class="sub">Couldn\\'t reach the scorer. ' + (err.message || err) + '</p><div class="btn-row" style="justify-content:center;"><button class="cta secondary" onclick="location.reload()">Start Over</button></div></div>';
   }
 };
 
