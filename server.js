@@ -4837,6 +4837,14 @@ async function startVoiceConsult({ difficulty, location_id }) {
   VOICE_DC = dc;
   dc.onopen = () => {
     voiceSetStatus('Listening…', 'listening');
+    // Server VAD waits for user audio before triggering a response. To make the
+    // prospect actually OPEN the consult (saying their canonical line first), we
+    // proactively kick off an initial response over the data channel.
+    try {
+      dc.send(JSON.stringify({ type: 'response.create' }));
+    } catch (err) {
+      console.warn('[Voice] failed to send initial response.create:', err);
+    }
   };
   dc.onmessage = (e) => {
     try { handleVoiceEvent(JSON.parse(e.data)); } catch (err) { console.error('voice event parse', err); }
