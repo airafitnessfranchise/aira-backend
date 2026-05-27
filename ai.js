@@ -1192,6 +1192,39 @@ function findScenarioById(scenario_id) {
   return null;
 }
 
+// ─────────── VOICE MODE HELPERS ───────────
+// Picks an OpenAI Realtime voice for each persona based on the persona's gender.
+// Voices used are the production-stable ones; can be expanded per-persona later.
+const FEMALE_PERSONAS = new Set([
+  "sarah-newmom",
+  "diane-spouse",
+  "daniela-singlemom",
+  "cassie-pricepic",
+  "kayla-trialseeker",
+  "jessica-comparing",
+  "vanessa-burned",
+]);
+
+function voiceForPersona(scenario_id) {
+  return FEMALE_PERSONAS.has(scenario_id) ? "coral" : "ash";
+}
+
+// Compose the full system prompt for the OpenAI Realtime model. This stitches together
+// the global TOUR_FICTION rule, the persona's systemPrompt, voice-specific delivery guidance,
+// and instructs the model to open with the persona's canonical first line.
+function buildVoiceInstructions(scenario) {
+  const voiceDelivery = `VOICE DELIVERY:
+- You are speaking, not typing. Use natural conversational pacing — pauses, "um", "uhh", short responses, real-person rhythm.
+- Don't sound like a script. Sound like a regular person sitting at a gym desk.
+- Keep responses 1–2 sentences max, just like in text mode.
+- If the rep interrupts you mid-sentence, stop and respond to what they just said. Don't talk over them.
+- Stay strictly in character as the prospect. NEVER break character to acknowledge that you are an AI, a roleplay, a simulation, or that this is practice. NEVER use phrases like "as an AI" or "in this scenario."
+
+OPENING:
+- Begin the consultation by saying EXACTLY this opening line, then wait for the rep to respond: "${scenario.opening}"`;
+  return TOUR_FICTION + "\n\n" + scenario.systemPrompt + "\n\n" + voiceDelivery;
+}
+
 module.exports = {
   transcribeAudio,
   scoreTranscript,
@@ -1203,4 +1236,6 @@ module.exports = {
   scorePracticeSession,
   GAME_LEVELS,
   findScenarioById,
+  voiceForPersona,
+  buildVoiceInstructions,
 };

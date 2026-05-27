@@ -26,6 +26,8 @@ const {
   scorePracticeSession,
   GAME_LEVELS,
   findScenarioById,
+  voiceForPersona,
+  buildVoiceInstructions,
 } = require("./ai");
 const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
@@ -55,11 +57,16 @@ const recorderLocationAliases = new Map();
 
 function audioExtensionForUpload(file) {
   const fromName = path.extname(file?.originalname || "").toLowerCase();
-  if ([".m4a", ".mp4", ".webm", ".mp3", ".wav", ".mpeg", ".mpga"].includes(fromName)) {
+  if (
+    [".m4a", ".mp4", ".webm", ".mp3", ".wav", ".mpeg", ".mpga"].includes(
+      fromName,
+    )
+  ) {
     return fromName;
   }
   const mime = String(file?.mimetype || "").toLowerCase();
-  if (mime.includes("mp4") || mime.includes("m4a") || mime.includes("aac")) return ".m4a";
+  if (mime.includes("mp4") || mime.includes("m4a") || mime.includes("aac"))
+    return ".m4a";
   if (mime.includes("mpeg") || mime.includes("mp3")) return ".mp3";
   if (mime.includes("wav")) return ".wav";
   return ".webm";
@@ -138,7 +145,9 @@ function base64url(input) {
 }
 
 function decodeBase64url(value) {
-  let normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  let normalized = String(value || "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
   while (normalized.length % 4) normalized += "=";
   return Buffer.from(normalized, "base64").toString("utf8");
 }
@@ -172,8 +181,10 @@ function verifyStaffToken(token) {
   if (payload.iss !== "aira-api" || payload.aud !== "aira-backend") {
     throw new Error("invalid_recorder_token_claims");
   }
-  if (payload.nbf && now + 60 < payload.nbf) throw new Error("recorder_token_not_yet_valid");
-  if (!payload.exp || now - 60 > payload.exp) throw new Error("recorder_token_expired");
+  if (payload.nbf && now + 60 < payload.nbf)
+    throw new Error("recorder_token_not_yet_valid");
+  if (!payload.exp || now - 60 > payload.exp)
+    throw new Error("recorder_token_expired");
   if (!["super_admin", "vp", "franchisee"].includes(payload.role)) {
     throw new Error("recorder_token_role_denied");
   }
@@ -234,12 +245,16 @@ function verifyRecordingResultToken(token, recordingId) {
 }
 
 function normalizeLocationId(id) {
-  return String(id || "").toLowerCase().trim();
+  return String(id || "")
+    .toLowerCase()
+    .trim();
 }
 
 function resolveRecorderLocationId(id) {
   const canonical = canonicalLocationId(id);
-  return recorderLocationAliases.get(normalizeLocationId(canonical)) || canonical;
+  return (
+    recorderLocationAliases.get(normalizeLocationId(canonical)) || canonical
+  );
 }
 
 function staffCanAccessLocation(req, locationId) {
@@ -247,7 +262,9 @@ function staffCanAccessLocation(req, locationId) {
   if (!staff) return false;
   if (staff.is_super) return true;
   const resolved = resolveRecorderLocationId(locationId);
-  return (staff.location_ids || []).map(normalizeLocationId).includes(normalizeLocationId(resolved));
+  return (staff.location_ids || [])
+    .map(normalizeLocationId)
+    .includes(normalizeLocationId(resolved));
 }
 
 function ensureStaffLocationAccess(req, res, locationId) {
@@ -264,12 +281,18 @@ function filterRecordingsForStaff(req, recordings) {
 }
 
 function filterScorecardsForRecordings(scorecards, recordings) {
-  const visibleIds = new Set((recordings || []).map((recording) => recording.recording_id));
-  return (scorecards || []).filter((scorecard) => visibleIds.has(scorecard.recording_id));
+  const visibleIds = new Set(
+    (recordings || []).map((recording) => recording.recording_id),
+  );
+  return (scorecards || []).filter((scorecard) =>
+    visibleIds.has(scorecard.recording_id),
+  );
 }
 
 function staffTokenQuery(req) {
-  return req.staffToken ? `staff_token=${encodeURIComponent(req.staffToken)}` : "";
+  return req.staffToken
+    ? `staff_token=${encodeURIComponent(req.staffToken)}`
+    : "";
 }
 
 function withStaffToken(req, href) {
@@ -357,9 +380,7 @@ app.get("/recording-result/:id", async (req, res) => {
     const scorecard = await db.getScorecardByRecording(recording.recording_id);
     return res.json({
       ok: true,
-      ready:
-        recording.processing_status === "scored" &&
-        Boolean(scorecard),
+      ready: recording.processing_status === "scored" && Boolean(scorecard),
       recording: {
         recording_id: recording.recording_id,
         location_id: recording.location_id,
@@ -746,7 +767,10 @@ function deltaHtml(current, prev, suffix = "", invert = false) {
 
 app.get("/admin", adminAuth, async (req, res) => {
   try {
-    const recordings = filterRecordingsForStaff(req, await db.getAllRecordings());
+    const recordings = filterRecordingsForStaff(
+      req,
+      await db.getAllRecordings(),
+    );
     const scorecards = filterScorecardsForRecordings(
       await db.getAllScorecards(),
       recordings,
@@ -1121,7 +1145,8 @@ app.get("/admin", adminAuth, async (req, res) => {
     const rows = recordingsInPeriod
       .map((r) => {
         const sc = scorecardMap[r.recording_id];
-        const loc = byLocationId[resolveRecorderLocationId(r.location_id)] || {};
+        const loc =
+          byLocationId[resolveRecorderLocationId(r.location_id)] || {};
         const name = r.contact_name || r.appointment_id;
         return `<tr>
         <td style="padding:14px 16px;border-bottom:1px solid #F3F4F6;font-size:13px;color:#6B7280;white-space:nowrap;">${fmtDate(r.recorded_at)}</td>
@@ -1274,7 +1299,10 @@ tbody tr:hover{background:#F9FAFB;}
                 day: "numeric",
               })
             : "—";
-          const href = withStaffToken(req, `/admin/location/${encodeURIComponent(l.location_id)}?range=${period.range}`);
+          const href = withStaffToken(
+            req,
+            `/admin/location/${encodeURIComponent(l.location_id)}?range=${period.range}`,
+          );
           return `<tr style="cursor:pointer;" onclick="window.location='${href}'" title="View ${l.franchise_name} dashboard">
           <td style="text-align:left;">
             <div style="font-size:13px;font-weight:700;color:#0284C7;">${l.franchise_name} <span style="color:#9CA3AF;font-weight:600;">→</span></div>
@@ -1370,7 +1398,8 @@ tbody tr:hover{background:#F9FAFB;}
 // ─────────── /admin/locations — add gyms without touching code ───────────
 
 app.get("/admin/locations", adminAuth, async (req, res) => {
-  if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
+  if (!req.staff?.is_super)
+    return res.status(403).send("Owner access required.");
   const customs = await db.getCustomLocations();
   const allLocs = ALL_LOCATIONS.slice().sort((a, b) =>
     (a.franchise_name || "").localeCompare(b.franchise_name || ""),
@@ -1533,7 +1562,8 @@ app.post(
   express.urlencoded({ extended: true }),
   async (req, res) => {
     try {
-      if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
+      if (!req.staff?.is_super)
+        return res.status(403).send("Owner access required.");
       const slug = String(req.body.location_id || "")
         .trim()
         .toLowerCase();
@@ -1593,7 +1623,8 @@ app.post(
 
 app.post("/admin/locations/delete/:id", adminAuth, async (req, res) => {
   try {
-    if (!req.staff?.is_super) return res.status(403).send("Owner access required.");
+    if (!req.staff?.is_super)
+      return res.status(403).send("Owner access required.");
     const slug = String(req.params.id).toLowerCase();
     const existing = byLocationId[slug];
     if (!existing || !existing._custom) {
@@ -2097,7 +2128,10 @@ tbody tr:hover{background:#F9FAFB;}
 
 app.get("/admin/library", adminAuth, async (req, res) => {
   try {
-    const recordings = filterRecordingsForStaff(req, await db.getAllRecordings());
+    const recordings = filterRecordingsForStaff(
+      req,
+      await db.getAllRecordings(),
+    );
     const scorecards = filterScorecardsForRecordings(
       await db.getAllScorecards(),
       recordings,
@@ -2203,7 +2237,8 @@ app.get("/admin/library", adminAuth, async (req, res) => {
       if (!rec.transcript) continue;
       const sc = latestByRec.get(rec.recording_id);
       if (!sc) continue;
-      const loc = byLocationId[resolveRecorderLocationId(rec.location_id)] || {};
+      const loc =
+        byLocationId[resolveRecorderLocationId(rec.location_id)] || {};
       for (const b of buckets) {
         for (const p of b.patterns) {
           const m = rec.transcript.match(p);
@@ -2395,6 +2430,108 @@ app.post("/practice/turn", async (req, res) => {
   }
 });
 
+// ─────────── VOICE MODE ───────────
+// Mints an OpenAI Realtime ephemeral session keyed to a new practice session. The
+// browser then uses that ephemeral key to establish a WebRTC peer connection directly
+// to OpenAI for low-latency speech-to-speech with the prospect persona.
+app.post("/practice/voice/session", async (req, res) => {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return res
+        .status(500)
+        .json({ ok: false, error: "OPENAI_API_KEY not configured" });
+    }
+    const difficulty = String(req.body.difficulty || "medium").toLowerCase();
+    if (!PROSPECT_PERSONAS[difficulty])
+      return res.status(400).json({ ok: false, error: "Invalid difficulty" });
+    const location_id = req.body.location_id
+      ? canonicalLocationId(req.body.location_id)
+      : null;
+    const cookieRaw = req.headers.cookie || "";
+    const m = cookieRaw.match(/aira_seen=([^;]+)/);
+    const recently_seen = m ? decodeURIComponent(m[1]) : "";
+    const player_name = req.body.player_name || null;
+
+    // Create the in-memory practice session — same scenario picker as text mode.
+    const start = startPracticeSession({
+      difficulty,
+      location_id,
+      recently_seen,
+      mode: "practice",
+      player_id: null,
+      player_name,
+      forced_scenario_id: req.body.scenario_id || null,
+      coach_mode: false, // voice coach hints come in Milestone 2
+    });
+
+    // Look up the full scenario object so we can build the voice instructions.
+    const scenario = findScenarioById(start.scenario_id);
+    if (!scenario)
+      return res
+        .status(500)
+        .json({ ok: false, error: "Scenario not found after pick" });
+
+    const voice = voiceForPersona(scenario.id);
+    const instructions = buildVoiceInstructions(scenario);
+    const model = "gpt-realtime";
+
+    // Mint the ephemeral key from OpenAI. Valid for ~1 minute, used once for the
+    // WebRTC handshake. After the SDP exchange, the connection survives without it.
+    const oaResp = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        voice,
+        instructions,
+        modalities: ["audio", "text"],
+        input_audio_transcription: { model: "whisper-1" },
+        turn_detection: {
+          type: "server_vad",
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 600,
+        },
+      }),
+    });
+    if (!oaResp.ok) {
+      const txt = await oaResp.text();
+      console.error(
+        "[VoicePractice] OpenAI session error:",
+        oaResp.status,
+        txt,
+      );
+      return res
+        .status(502)
+        .json({ ok: false, error: "OpenAI session error: " + txt });
+    }
+    const session = await oaResp.json();
+    const ephemeral_key = session?.client_secret?.value;
+    if (!ephemeral_key)
+      return res
+        .status(502)
+        .json({ ok: false, error: "OpenAI did not return an ephemeral key" });
+
+    res.json({
+      ok: true,
+      session_id: start.session_id,
+      scenario_id: start.scenario_id,
+      persona_label: start.persona_label,
+      persona_name: start.persona_name,
+      opening: start.opening,
+      ephemeral_key,
+      voice,
+      model,
+    });
+  } catch (err) {
+    console.error("[VoicePractice] session error:", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.post("/practice/end", async (req, res) => {
   try {
     const { session_id } = req.body;
@@ -2405,6 +2542,16 @@ app.post("/practice/end", async (req, res) => {
       return res
         .status(404)
         .json({ ok: false, error: "Session not found or expired" });
+
+    // Voice mode: client posts the full transcript collected from the WebRTC data
+    // channel since the in-memory session doesn't see the audio. Overwrite messages
+    // before scoring so the scorer reads the actual conversation.
+    if (Array.isArray(req.body.messages) && req.body.messages.length > 0) {
+      session.messages = req.body.messages
+        .filter((m) => m && m.role && typeof m.content === "string")
+        .map((m) => ({ role: m.role, content: m.content }));
+    }
+
     if (session.messages.length < 4) {
       return res.status(400).json({
         ok: false,
@@ -4321,6 +4468,22 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
 .coach-use{padding:6px 12px;background:linear-gradient(135deg,#00AEEF,#7C3AED);color:#fff;border:0;border-radius:8px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:filter .15s;}
 .coach-use:hover{filter:brightness(1.1);}
 
+/* VOICE MODE */
+.voice-toggle .ct-title{color:#A78BFA;}
+.voice-stage{padding:28px 22px;display:flex;flex-direction:column;align-items:center;gap:14px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;}
+.voice-orb{position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;}
+.voice-orb-inner{position:absolute;inset:18px;background:radial-gradient(circle at 30% 30%,#60A5FA,#7C3AED 60%,#1E1B4B);border-radius:50%;box-shadow:0 0 40px rgba(124,58,237,0.45),inset 0 0 30px rgba(255,255,255,0.18);transition:transform .25s ease,box-shadow .25s ease;}
+.voice-orb-pulse{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(124,58,237,0.5);opacity:0;}
+.voice-orb.listening .voice-orb-inner{transform:scale(1.06);box-shadow:0 0 60px rgba(0,174,239,0.7),inset 0 0 30px rgba(255,255,255,0.25);background:radial-gradient(circle at 30% 30%,#22D3EE,#00AEEF 60%,#0C4A6E);}
+.voice-orb.listening .voice-orb-pulse{animation:voicePulse 1.4s ease-out infinite;border-color:rgba(0,174,239,0.6);}
+.voice-orb.speaking .voice-orb-inner{transform:scale(1.12);box-shadow:0 0 70px rgba(236,72,153,0.6),inset 0 0 30px rgba(255,255,255,0.3);background:radial-gradient(circle at 30% 30%,#F472B6,#EC4899 60%,#4C1D95);}
+.voice-orb.speaking .voice-orb-pulse{animation:voicePulse 1.0s ease-out infinite;border-color:rgba(236,72,153,0.6);}
+@keyframes voicePulse{0%{opacity:0.8;transform:scale(1);}100%{opacity:0;transform:scale(1.45);}}
+.voice-status{font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#22D3EE;}
+.voice-orb.speaking ~ .voice-status,.voice-orb.speaking + .voice-status{color:#F472B6;}
+.voice-hint{font-size:12.5px;color:#9CA3AF;text-align:center;max-width:420px;line-height:1.5;}
+.voice-error{padding:14px 18px;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.35);border-radius:10px;color:#FCA5A5;font-size:13px;margin:14px 22px;}
+
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:10px;align-items:flex-end;flex-shrink:0;}
 .chat-input textarea{flex:1;padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:#fff;font-size:14px;font-family:inherit;resize:none;min-height:46px;max-height:140px;line-height:1.4;transition:border-color .2s;}
 .chat-input textarea:focus{outline:none;border-color:#00AEEF;background:rgba(0,174,239,0.04);}
@@ -4409,6 +4572,13 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
               Real-time hints when you go off-script. After each thing you type, we tell you if it was the right move and suggest better wording when it wasn't. Best for new reps still learning.
             </span>
           </label>
+          <label class="coach-toggle voice-toggle">
+            <input id="voice-mode" type="checkbox" />
+            <span class="ct-body">
+              <span class="ct-title">🎙️ Voice Mode <span class="ct-new">NEW</span></span>
+              Speak to the prospect out loud like a real consult. Your mic feeds the AI, the prospect speaks back. Closest thing to the actual floor. Coached hints not available in voice mode yet — coming soon.
+            </span>
+          </label>
           <button class="cta" id="start-btn">Start Consult →</button>
         </div>
       </div>
@@ -4424,6 +4594,23 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
           <textarea id="rep-input" placeholder="What do you say to the prospect?" rows="1"></textarea>
           <button id="send-btn">Send</button>
         </div>
+      </div>
+
+      <!-- VOICE CHAT -->
+      <div id="voice" class="chat-frame hidden">
+        <div class="chat-header">
+          <div class="chat-persona">🎙️ Voice consult with: <b id="voice-persona-label">—</b></div>
+          <button class="chat-end" id="voice-end-btn">End &amp; Score</button>
+        </div>
+        <div class="voice-stage">
+          <div class="voice-orb" id="voice-orb">
+            <div class="voice-orb-inner"></div>
+            <div class="voice-orb-pulse"></div>
+          </div>
+          <div class="voice-status" id="voice-status">Connecting…</div>
+          <div class="voice-hint" id="voice-hint">Speak naturally when the prospect finishes. The AI will respond out loud.</div>
+        </div>
+        <div class="chat-body" id="voice-messages"></div>
       </div>
 
       <!-- SCORE -->
@@ -4504,13 +4691,34 @@ async function postJson(url, body) {
   return r.json();
 }
 
+// Voice mode disables coach mode (Milestone 1 — coach hints coming in M2).
+$('voice-mode').addEventListener('change', () => {
+  if ($('voice-mode').checked) {
+    $('coach-mode').checked = false;
+    $('coach-mode').disabled = true;
+  } else {
+    $('coach-mode').disabled = false;
+  }
+});
+
 $('start-btn').onclick = async () => {
   const difficulty = $('difficulty').value;
   const location_id = $('location').value;
   const coach_mode = $('coach-mode').checked;
+  const voice_mode = $('voice-mode').checked;
   if (!location_id) { alert('Please select your gym'); return; }
   $('start-btn').disabled = true;
   $('start-btn').textContent = 'Starting…';
+  if (voice_mode) {
+    try {
+      await startVoiceConsult({ difficulty, location_id });
+    } catch (err) {
+      alert('Voice mode error: ' + (err.message || err));
+      $('start-btn').disabled = false;
+      $('start-btn').textContent = 'Start Consult →';
+    }
+    return;
+  }
   const r = await postJson('/practice/start', { difficulty, location_id, coach_mode, player_name: PLAYER_NAME || null });
   if (!r.ok) { alert('Error: ' + r.error); $('start-btn').disabled = false; $('start-btn').textContent = 'Start Consult →'; return; }
   SESSION_ID = r.session_id;
@@ -4523,6 +4731,176 @@ $('start-btn').onclick = async () => {
   sceneSet(r.persona_name || 'the prospect');
   bubble('prospect', r.opening);
   $('rep-input').focus();
+};
+
+// ─────────── VOICE MODE CLIENT ───────────
+// Uses OpenAI Realtime API over WebRTC for bidirectional audio with the prospect persona.
+// The server mints an ephemeral key tied to a regular practice session; we hand the
+// transcript back to /practice/end at the close for scoring with the existing rubric.
+let VOICE_PC = null;
+let VOICE_DC = null;
+let VOICE_AUDIO_EL = null;
+let VOICE_LOCAL_STREAM = null;
+let VOICE_TRANSCRIPT = []; // [{ role: 'user'|'assistant', content }]
+let VOICE_PENDING_ASSISTANT = ''; // accumulates assistant text deltas
+
+function voiceSetStatus(text, mode) {
+  $('voice-status').textContent = text;
+  const orb = $('voice-orb');
+  orb.classList.remove('listening', 'speaking');
+  if (mode === 'listening') orb.classList.add('listening');
+  if (mode === 'speaking') orb.classList.add('speaking');
+}
+
+function voiceAppendMessage(role, content) {
+  if (!content || !content.trim()) return;
+  VOICE_TRANSCRIPT.push({ role, content: content.trim() });
+  const div = document.createElement('div');
+  div.className = 'bubble ' + (role === 'user' ? 'rep' : 'prospect');
+  div.textContent = content.trim();
+  $('voice-messages').appendChild(div);
+  $('voice-messages').scrollTop = $('voice-messages').scrollHeight;
+}
+
+async function startVoiceConsult({ difficulty, location_id }) {
+  voiceSetStatus('Requesting microphone…', null);
+  // 1. Request mic FIRST so the user grants permission before we burn an OpenAI session.
+  let micStream;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    throw new Error('Microphone access denied. Voice mode needs your mic.');
+  }
+  VOICE_LOCAL_STREAM = micStream;
+
+  // 2. Mint ephemeral OpenAI session on the server.
+  voiceSetStatus('Starting session…', null);
+  const r = await postJson('/practice/voice/session', {
+    difficulty, location_id, player_name: PLAYER_NAME || null,
+  });
+  if (!r.ok) {
+    micStream.getTracks().forEach((t) => t.stop());
+    throw new Error(r.error || 'Failed to start voice session');
+  }
+  SESSION_ID = r.session_id;
+  SCENARIO_ID = r.scenario_id || '';
+  COACH_MODE = false;
+  VOICE_TRANSCRIPT = [];
+  VOICE_PENDING_ASSISTANT = '';
+
+  $('voice-persona-label').textContent = r.persona_label + (r.persona_name ? ' — ' + r.persona_name : '');
+  $('start').classList.add('hidden');
+  $('voice').classList.remove('hidden');
+
+  // 3. WebRTC peer connection. Audio in (mic) + audio out (prospect voice) + data channel.
+  const pc = new RTCPeerConnection();
+  VOICE_PC = pc;
+
+  // Remote audio element for the prospect's voice.
+  VOICE_AUDIO_EL = document.createElement('audio');
+  VOICE_AUDIO_EL.autoplay = true;
+  pc.ontrack = (e) => { VOICE_AUDIO_EL.srcObject = e.streams[0]; };
+
+  // Send our mic.
+  micStream.getTracks().forEach((track) => pc.addTrack(track, micStream));
+
+  // Data channel for control events + transcripts.
+  const dc = pc.createDataChannel('oai-events');
+  VOICE_DC = dc;
+  dc.onopen = () => {
+    voiceSetStatus('Listening…', 'listening');
+  };
+  dc.onmessage = (e) => {
+    try { handleVoiceEvent(JSON.parse(e.data)); } catch (err) { console.error('voice event parse', err); }
+  };
+  dc.onclose = () => { voiceSetStatus('Call ended', null); };
+
+  // 4. SDP handshake with OpenAI Realtime.
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const sdpResp = await fetch('https://api.openai.com/v1/realtime?model=' + encodeURIComponent(r.model), {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + r.ephemeral_key,
+      'Content-Type': 'application/sdp',
+    },
+    body: offer.sdp,
+  });
+  if (!sdpResp.ok) {
+    const txt = await sdpResp.text();
+    cleanupVoice();
+    throw new Error('OpenAI WebRTC handshake failed: ' + txt);
+  }
+  const answerSdp = await sdpResp.text();
+  await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+  voiceSetStatus('Connecting…', null);
+}
+
+function handleVoiceEvent(ev) {
+  const t = ev.type || '';
+  // Prospect started speaking
+  if (t === 'response.audio.delta' || t === 'response.audio_transcript.delta' || t === 'output_audio_buffer.started') {
+    voiceSetStatus(($('voice-persona-label').textContent.split('—').pop() || 'Prospect').trim() + ' speaking…', 'speaking');
+  }
+  // User speech detected
+  if (t === 'input_audio_buffer.speech_started') {
+    voiceSetStatus('You are speaking…', 'listening');
+  }
+  if (t === 'input_audio_buffer.speech_stopped') {
+    voiceSetStatus('Listening…', 'listening');
+  }
+  // Capture user transcript (Whisper)
+  if (t === 'conversation.item.input_audio_transcription.completed') {
+    if (ev.transcript) voiceAppendMessage('user', ev.transcript);
+  }
+  // Capture assistant text — Realtime API emits these per-response.
+  if (t === 'response.audio_transcript.delta' && ev.delta) {
+    VOICE_PENDING_ASSISTANT += ev.delta;
+  }
+  if (t === 'response.audio_transcript.done') {
+    const finalText = (ev.transcript || VOICE_PENDING_ASSISTANT || '').trim();
+    if (finalText) voiceAppendMessage('assistant', finalText);
+    VOICE_PENDING_ASSISTANT = '';
+  }
+  if (t === 'response.done') {
+    voiceSetStatus('Listening…', 'listening');
+  }
+  if (t === 'error') {
+    console.error('[Voice] error event:', ev);
+  }
+}
+
+function cleanupVoice() {
+  try { if (VOICE_DC) VOICE_DC.close(); } catch (e) {}
+  try { if (VOICE_PC) VOICE_PC.close(); } catch (e) {}
+  try { if (VOICE_LOCAL_STREAM) VOICE_LOCAL_STREAM.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  VOICE_DC = null;
+  VOICE_PC = null;
+  VOICE_LOCAL_STREAM = null;
+}
+
+$('voice-end-btn').onclick = async () => {
+  $('voice-end-btn').disabled = true;
+  $('voice-end-btn').textContent = 'Scoring…';
+  voiceSetStatus('Ending call…', null);
+  cleanupVoice();
+  if (VOICE_TRANSCRIPT.length < 4) {
+    alert('Conversation too short to score — talk a bit more before ending the call.');
+    $('voice-end-btn').disabled = false;
+    $('voice-end-btn').textContent = 'End & Score';
+    return;
+  }
+  try {
+    const r = await postJson('/practice/end', { session_id: SESSION_ID, messages: VOICE_TRANSCRIPT });
+    if (!r.ok) throw new Error(r.error || 'Score request failed');
+    $('voice').classList.add('hidden');
+    renderScorecard(r.scorecard, r.messages);
+  } catch (err) {
+    alert('Scoring failed: ' + err.message);
+    $('voice-end-btn').disabled = false;
+    $('voice-end-btn').textContent = 'End & Score';
+  }
 };
 
 applyEmbedMode();
@@ -4907,7 +5285,9 @@ function registerLocation(loc, aliases = []) {
     byLocationId[normalizedAlias] = normalized;
     recorderLocationAliases.set(normalizedAlias, locationId);
     const aliasIdx = ALL_LOCATIONS.findIndex(
-      (x) => normalizeLocationId(x.location_id) === normalizedAlias && normalizedAlias !== locationId,
+      (x) =>
+        normalizeLocationId(x.location_id) === normalizedAlias &&
+        normalizedAlias !== locationId,
     );
     if (aliasIdx >= 0) ALL_LOCATIONS.splice(aliasIdx, 1);
   }
@@ -4921,9 +5301,12 @@ function registerLocation(loc, aliases = []) {
 
 async function syncAcsmLocations() {
   const secret = process.env.RECORDER_SYNC_SECRET;
-  const apiBase = process.env.AIRA_API_BASE_URL || "https://api.airafitness.com";
+  const apiBase =
+    process.env.AIRA_API_BASE_URL || "https://api.airafitness.com";
   if (!secret) {
-    console.log("[ACSM Locations] RECORDER_SYNC_SECRET not configured; skipping sync");
+    console.log(
+      "[ACSM Locations] RECORDER_SYNC_SECRET not configured; skipping sync",
+    );
     return;
   }
   try {
@@ -4938,7 +5321,10 @@ async function syncAcsmLocations() {
           location_id: row.location_id || row.id,
           franchise_name: row.franchise_name || row.name || row.id,
           franchisee_name: "",
-          franchisee_email: row.club_email || process.env.MIKE_EMAIL || "mikebell@airafitness.com",
+          franchisee_email:
+            row.club_email ||
+            process.env.MIKE_EMAIL ||
+            "mikebell@airafitness.com",
           club_email: row.club_email || "",
           _acsm: true,
         },
