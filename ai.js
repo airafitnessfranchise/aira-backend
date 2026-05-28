@@ -1221,18 +1221,10 @@ function findScenarioById(scenario_id) {
 // ─────────── VOICE MODE HELPERS ───────────
 // Picks an OpenAI Realtime voice for each persona based on the persona's gender.
 // Voices used are the production-stable ones; can be expanded per-persona later.
-const FEMALE_PERSONAS = new Set([
-  "sarah-newmom",
-  "diane-spouse",
-  "daniela-singlemom",
-  "cassie-pricepic",
-  "kayla-trialseeker",
-  "jessica-comparing",
-  "vanessa-burned",
-]);
-
+// Every prospect uses "marin" — OpenAI's most natural female voice. Kept as a
+// function (not a constant) so per-persona voice matching can return later.
 function voiceForPersona(scenario_id) {
-  return FEMALE_PERSONAS.has(scenario_id) ? "coral" : "ash";
+  return "marin";
 }
 
 // Compose the full system prompt for the OpenAI Realtime model. This stitches together
