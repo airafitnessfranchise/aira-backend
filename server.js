@@ -4815,6 +4815,15 @@ function voiceSetStatus(text, mode) {
   if (mode === 'speaking') orb.classList.add('speaking');
 }
 
+// Enable/disable the local mic track. We DISABLE it while the prospect is speaking
+// so the AI's own voice (playing through laptop/phone speakers) can't be picked up
+// by the mic, transcribed by Whisper as a user turn, and answered again — the runaway
+// self-answer loop. WebRTC echo cancellation alone is unreliable without headphones.
+function setVoiceMicEnabled(on) {
+  if (!VOICE_LOCAL_STREAM) return;
+  VOICE_LOCAL_STREAM.getAudioTracks().forEach((trk) => { trk.enabled = on; });
+}
+
 function voiceAppendMessage(role, content) {
   if (!content || !content.trim()) return;
   VOICE_TRANSCRIPT.push({ role, content: content.trim() });
@@ -4933,6 +4942,16 @@ function handleVoiceEvent(ev) {
   // Prospect started speaking — GA event name is response.output_audio.delta
   if (t === 'response.output_audio.delta' || t === 'response.output_audio_transcript.delta') {
     voiceSetStatus(($('voice-persona-label').textContent.split('—').pop() || 'Prospect').trim() + ' speaking…', 'speaking');
+    setVoiceMicEnabled(false); // belt-and-suspenders in case output_audio_buffer.started didn't fire
+  }
+  // WebRTC audio playback lifecycle — the authoritative signal for "the prospect is
+  // currently audible." Mute the mic on start, unmute shortly after stop so the
+  // speaker tail/echo clears before we listen for the rep again.
+  if (t === 'output_audio_buffer.started') {
+    setVoiceMicEnabled(false);
+  }
+  if (t === 'output_audio_buffer.stopped' || t === 'output_audio_buffer.cleared') {
+    setTimeout(() => setVoiceMicEnabled(true), 250);
   }
   // User speech detected via server VAD
   if (t === 'input_audio_buffer.speech_started') {
