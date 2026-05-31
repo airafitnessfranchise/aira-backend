@@ -274,6 +274,59 @@ function ensureStaffLocationAccess(req, res, locationId) {
   return false;
 }
 
+async function requireAiraStaffBearer(req, res, next) {
+  const auth = req.headers.authorization || "";
+  const [scheme, token] = auth.split(" ");
+  if (scheme !== "Bearer" || !token) {
+    return res.status(401).json({ ok: false, error: "Authentication required" });
+  }
+
+  if (process.env.RECORDER_TOKEN_SECRET) {
+    try {
+      const payload = verifyStaffToken(token);
+      req.staffToken = token;
+      req.staff = {
+        email: payload.email,
+        name: payload.name,
+        role: payload.role,
+        location_ids: Array.isArray(payload.location_ids)
+          ? payload.location_ids.map(normalizeLocationId)
+          : [],
+        is_super: payload.role === "super_admin",
+      };
+      return next();
+    } catch (_) {
+      // Staff app uploads send the Supabase admin session token, not the
+      // short-lived recorder token used by browser dashboard links.
+    }
+  }
+
+  const apiBase = process.env.AIRA_API_BASE_URL || "https://api.airafitness.com";
+  try {
+    const { data } = await axios.get(`${apiBase}/admin/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000,
+    });
+    const locationIds = Array.isArray(data?.location_ids)
+      ? data.location_ids
+      : [];
+    req.staffToken = token;
+    req.staff = {
+      email: data?.email,
+      name: data?.name,
+      role: data?.role,
+      location_ids: (locationIds.length ? locationIds : [data?.location_id])
+        .filter(Boolean)
+        .map(normalizeLocationId),
+      is_super: data?.role === "super_admin" || data?.scope === "all",
+    };
+    return next();
+  } catch (err) {
+    console.warn("[StaffAuth] bearer rejected:", err.response?.status || err.message);
+    return res.status(401).json({ ok: false, error: "Invalid or expired staff session" });
+  }
+}
+
 function filterRecordingsForStaff(req, recordings) {
   if (req.staff?.is_super) return recordings;
   return (recordings || []).filter((recording) =>
@@ -317,13 +370,16 @@ app.post("/webhook/ghl", async (req, res) => {
   });
 });
 
-app.post("/upload/recording", upload.single("audio_file"), async (req, res) => {
+app.post("/upload/recording", requireAiraStaffBearer, upload.single("audio_file"), async (req, res) => {
   console.log("[Upload] Audio file received");
   const appointment_id = req.body.appointment_id;
   const location_id = (req.body.location_id || "").toLowerCase();
   const duration_seconds = req.body.duration_seconds;
   const contact_name = req.body.contact_name;
   const file = req.file;
+  if (!staffCanAccessLocation(req, location_id)) {
+    return res.status(403).json({ success: false, message: "You do not have access to this gym's scorecards." });
+  }
   if (!file)
     return res.status(400).json({ success: false, message: "No audio file" });
   console.log(
@@ -368,7 +424,7 @@ app.post("/upload/recording", upload.single("audio_file"), async (req, res) => {
   );
 });
 
-app.get("/recording-result/:id", async (req, res) => {
+app.get("/recording-result/:id", requireAiraStaffBearer, async (req, res) => {
   try {
     verifyRecordingResultToken(
       req.query.result_token || req.headers["x-aira-recording-result-token"],
@@ -377,6 +433,9 @@ app.get("/recording-result/:id", async (req, res) => {
     const recording = await db.getRecording(req.params.id);
     if (!recording) {
       return res.status(404).json({ ok: false, error: "Recording not found" });
+    }
+    if (!staffCanAccessLocation(req, recording.location_id)) {
+      return res.status(403).json({ ok: false, error: "You do not have access to this gym's scorecards." });
     }
     const scorecard = await db.getScorecardByRecording(recording.recording_id);
     return res.json({
