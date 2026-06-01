@@ -443,7 +443,9 @@ async function sendPracticeEmail({
     .filter(Boolean)
     .join("\n");
 
-  const recipients = [MIKE_EMAIL];
+  // Practice scores also go to the VP (Alyssa) so she sees everyone using the practice bot.
+  const PRACTICE_CC_EMAIL = process.env.PRACTICE_CC_EMAIL || "akathan24@gmail.com";
+  const recipients = [...new Set([MIKE_EMAIL, PRACTICE_CC_EMAIL].filter(Boolean))];
   console.log(
     `[Practice Email] Sending session ${session_id} to: ${recipients.join(", ")}`,
   );
