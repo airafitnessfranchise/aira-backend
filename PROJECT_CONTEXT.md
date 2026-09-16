@@ -45,7 +45,7 @@ All three feed the same `practice_sessions` corpus (mode flag distinguishes them
 
 Two completely separate auth systems on purpose:
 
-1. **HTTP Basic Auth** (`adminAuth` middleware in `server.js`) gates browser-facing admin pages. Username `admin`, password `airafitness` by default; override by setting `ADMIN_PASSWORD` env var in Railway. Browser prompts natively. Applied to `/admin`, `/admin/library`, `/scorecard/:id`, `/playback/:id`.
+1. **Signed Aira Admin staff tokens** are the normal browser access path. Open Scorecards through Aira Admin. `adminAuth` in `admin-auth.js` verifies the existing token protocol and preserves role/gym scope. There is no default password. Optional HTTP Basic owner recovery requires an explicitly configured random `ADMIN_PASSWORD` of at least 32 non-padding characters; absent or short values disable Basic access. See `docs/recorder-admin-authentication.md` for rollout and recovery.
 2. **`X-Admin-Key` header** gates the `/admin/rescore/:id` automation endpoint. The key is in the `ADMIN_KEY` Railway env var. Used for one-off operations like manually re-scoring a stuck recording.
 3. **`/practice` and `/airafitnessclosinggame` are intentionally unauthenticated.** Franchisees use them freely. The game uses a cookie-generated UUID (`aira_player_id`) as identity — no login screen, persistence per-browser.
 
@@ -366,7 +366,7 @@ Brand-language pages matching the email layout. Scorecard shows the full breakdo
 | `RESEND_API_KEY`                                   | Email delivery                                 | required                                              |
 | `MIKE_EMAIL`                                       | Recipient for all scorecards + practice emails | `mikebell@airafitness.com`                            |
 | `EMAIL_FROM`                                       | Resend sender                                  | `onboarding@resend.dev`                               |
-| `ADMIN_PASSWORD`                                   | Basic Auth for /admin pages                    | `airafitness`                                         |
+| `ADMIN_PASSWORD` | Optional owner recovery for protected recorder pages | No default; Basic disabled unless explicitly configured with a random value of at least 32 non-padding characters |
 | `ADMIN_KEY`                                        | Header auth for /admin/rescore                 | `5979e9f509...665e0d...` (set in Railway)             |
 | `FLAG_SCORE_THRESHOLD`                             | flag for review when total<this                | 70                                                    |
 | `PUBLIC_URL`                                       | Used in email links                            | `https://aira-backend-production-2a71.up.railway.app` |

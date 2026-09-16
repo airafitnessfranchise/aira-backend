@@ -33,6 +33,7 @@ const {
 const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
 const vpRoutes = require("./vp-routes");
+const { createAdminAuth } = require("./admin-auth");
 
 const app = express();
 const server = http.createServer(app);
@@ -666,54 +667,9 @@ app.post("/admin/rescore/:id", async (req, res) => {
   res.json({ ok: true, id, started_at, test_only: !!testOnly });
 });
 
-// HTTP Basic Auth middleware for the admin browser pages.
-// Default password "airafitness" — override by setting ADMIN_PASSWORD in Railway env.
-// Username is always "admin".
-function adminAuth(req, res, next) {
-  const token =
-    req.query.staff_token ||
-    (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (token && process.env.RECORDER_TOKEN_SECRET) {
-    try {
-      const payload = verifyStaffToken(token);
-      req.staffToken = token;
-      req.staff = {
-        email: payload.email,
-        name: payload.name,
-        role: payload.role,
-        location_ids: Array.isArray(payload.location_ids)
-          ? payload.location_ids.map(normalizeLocationId)
-          : [],
-        is_super: payload.role === "super_admin",
-      };
-      return next();
-    } catch (err) {
-      console.warn("[AdminAuth] staff token rejected:", err.message);
-    }
-  }
-
-  const password = process.env.ADMIN_PASSWORD || "airafitness";
-  const auth = req.headers.authorization || "";
-  const [scheme, encoded] = auth.split(" ");
-  if (scheme === "Basic" && encoded) {
-    const decoded = Buffer.from(encoded, "base64").toString("utf8");
-    const idx = decoded.indexOf(":");
-    const user = idx >= 0 ? decoded.slice(0, idx) : decoded;
-    const pass = idx >= 0 ? decoded.slice(idx + 1) : "";
-    if (user === "admin" && pass === password) {
-      req.staff = {
-        email: "admin@local",
-        name: "Aira Admin",
-        role: "super_admin",
-        location_ids: [],
-        is_super: true,
-      };
-      return next();
-    }
-  }
-  res.set("WWW-Authenticate", 'Basic realm="Aira Admin"');
-  return res.status(401).send("Authentication required");
-}
+// Use the existing Aira Admin staff-token flow. Optional Basic recovery access
+// requires an explicitly configured strong credential; there is no fallback.
+const adminAuth = createAdminAuth({ verifyStaffToken, normalizeLocationId });
 
 // ─────────── Date range helper for /admin and /admin/location/:id ───────────
 // Accepts ?range=this_month|last_month|30d|90d|all|custom (+ ?from=&to= for custom).

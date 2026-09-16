@@ -100,5 +100,26 @@ Every scorecard is sent to three people:
 
 ## Admin Dashboard
 
-View all recordings and scores:
-https://aira-backend-production-2a71.up.railway.app/admin
+Sign in to Aira Admin and open **Scorecards** or **Training Library**. The Admin
+app obtains a signed, short-lived staff token from `aira-api`. The recorder verifies
+its signature, issuer, audience, expiry, and allowed role, then preserves the existing
+gym scope. Owner, VP, and franchisee roles remain supported.
+
+There is no built-in administrator password. Without a valid staff token, protected
+pages return HTTP 401. Old direct bookmarks must be opened through Aira Admin again.
+
+An explicitly configured `ADMIN_PASSWORD` enables optional owner recovery via HTTP
+Basic with username `admin`. The password must be randomly generated, stored in the
+owner's password manager, and contain at least 32 non-padding characters. Missing,
+empty, or shorter values leave Basic access disabled. Normal signed staff access
+continues independently. Do not put recovery credentials or staff tokens in source,
+reports, logs, or shared URLs.
+
+See [the recorder authentication runbook](docs/recorder-admin-authentication.md)
+for validation, rollout impact, and recovery.
+
+## Authentication tests
+
+Run `npm test`. These tests use synthetic credentials, the existing token verifier,
+and an isolated localhost HTTP server. They do not start `server.js`, connect to a
+database, record audio, call AI providers, or send email.

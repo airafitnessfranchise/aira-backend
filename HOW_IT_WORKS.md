@@ -20,7 +20,7 @@ We have three connected products. They share one database and one scoring brain 
 
 | Where                         | What                                                                      | Login                                    |
 | ----------------------------- | ------------------------------------------------------------------------- | ---------------------------------------- |
-| **`/admin`**                  | Your dashboard — every consult, every gym, every recurring mistake        | username `admin`, password `airafitness` |
+| **`/admin`** | Dashboard with recordings, scores, and coaching | Open **Scorecards** from the signed-in Aira Admin app |
 | **`/admin/library`**          | Real consult pairs — closed example next to no-sale example, by objection | same login                               |
 | **`/admin/locations`**        | Add new gyms (also page to manage existing ones)                          | same login                               |
 | **`/practice`**               | Practice tool for franchisees                                             | open, no login                           |
@@ -173,6 +173,8 @@ The game and the practice bot share the same persona library — the difference 
 
 ## The Dashboard (`/admin`)
 
+Open **Scorecards** from Aira Admin. The old shared default login has been removed. Direct bookmarks without a current staff token return an authentication message; return through Aira Admin to obtain a fresh token. Owner, VP, and franchisee roles retain their existing gym visibility.
+
 Auto-refreshes every 30 seconds. Top to bottom:
 
 ### KPI cards (6 of them)
@@ -306,7 +308,7 @@ Every practice and game session lands in your inbox with the rep's name + gym + 
 - **Tablet not recording / consult missing from dashboard** → check Tablets Online card on /admin. If the gym is offline, the franchisee needs to reconnect the tablet to wifi.
 - **Score feels wrong** → tell me which consult and what specifically feels off. The scoring prompt is tunable. Every correction Mike has made over the last few sessions has been incorporated.
 - **Want a new persona / level / feature** → ask. We can iterate fast on this stuff.
-- **Lost the admin password** → the password is `airafitness`. Reach out if you ever want to change it.
+- **Need access to scorecards** → sign in to Aira Admin and open **Scorecards**. Owner, VP, and franchisee access retains its existing role and gym scope.
 
 ---
 
