@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "verified_at": "2026-09-18T00:07:45.288183+00:00",
+  "archive_sha256": "7c66c372daf719e71715aab93822c6e8cecde23fc8ef33f4443b3b418f966f2d",
+  "sql_sha256": "e78b2928bc333f1613166a80c3f74cc7868c2174d2360b87b4167562a1bcc93b",
+  "image": "public.ecr.aws/supabase/postgres@sha256:95d92e9563121189086690a4b7f8f2b711a4809a2499f45592199aae68ebae5f",
+  "network": "none",
+  "published_ports": false,
+  "production_mutations": false,
+  "permission_checks": 260,
+  "all_five_rls_enabled": true,
+  "future_table_and_sequence_defaults_denied": true,
+  "rollback_matches_initial_permissions": true,
+  "repeat_apply_refused_atomically": true,
+  "recorder_database_workflows": {
+    "real_db_module": true,
+    "queries": 36,
+    "five_table_workflows_passed": true,
+    "external_services_called": false
+  },
+  "proof_limit": "Database module and permission proof; no physical tablet, AI, email, or live write test."
+}
