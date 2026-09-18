@@ -1,0 +1,128 @@
+{
+  "permissions": {
+    "verified_at": "2026-09-18T00:14:34.157Z",
+    "rls_tables": 5,
+    "public_effective_table_privileges": 0,
+    "public_effective_column_privileges": 0,
+    "recorder_future_public_grants": 0,
+    "service_access_tables": 5,
+    "public_policies": 0,
+    "advisors": {
+      "lints": [
+        {
+          "name": "rls_enabled_no_policy",
+          "title": "RLS Enabled No Policy",
+          "level": "INFO",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+          "count": 5,
+          "findings": [
+            {
+              "detail": "Table \\`public.custom_locations\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "custom_locations",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-09-18T00:14:15.541Z"
+            },
+            {
+              "detail": "Table \\`public.players\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "players",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-09-18T00:14:15.541Z"
+            },
+            {
+              "detail": "Table \\`public.practice_sessions\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "practice_sessions",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-09-18T00:14:15.541Z"
+            },
+            {
+              "detail": "Table \\`public.recordings\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "recordings",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-09-18T00:14:15.541Z"
+            },
+            {
+              "detail": "Table \\`public.scorecards\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "scorecards",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-09-18T00:14:15.541Z"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "readback": {
+    "verified_at": "2026-09-18T00:14:28.357428+00:00",
+    "read_only_checks": true,
+    "anonymous_rest_denied": {
+      "recordings": {
+        "status": 401,
+        "body_bytes": 0
+      },
+      "scorecards": {
+        "status": 401,
+        "body_bytes": 0
+      },
+      "practice_sessions": {
+        "status": 401,
+        "body_bytes": 0
+      },
+      "custom_locations": {
+        "status": 401,
+        "body_bytes": 0
+      },
+      "players": {
+        "status": 401,
+        "body_bytes": 0
+      }
+    },
+    "backup_tls_hostname_and_certificate_verified": true,
+    "backup_read_counts": {
+      "recordings": 84,
+      "scorecards": 86,
+      "practice_sessions": 46,
+      "custom_locations": 6,
+      "players": 14
+    },
+    "backup_writes_denied": [
+      "recordings",
+      "scorecards",
+      "practice_sessions",
+      "custom_locations",
+      "players"
+    ],
+    "recorder_health_http": 200,
+    "recorder_health": {
+      "status": "ok",
+      "recordings": 84,
+      "scorecards": 86,
+      "tablets_connected": 0
+    },
+    "signed_staff_head_status": 200,
+    "unauthenticated_admin_head_status": 401,
+    "signed_staff_proof": "60-second synthetic signed owner-token HEAD; proves live protected server/database reads, not interactive owner sign-in or tablet capture",
+    "credential_values_written": false,
+    "paid_or_recording_actions": false
+  },
+  "approved_operation_sha256": "e78b2928bc333f1613166a80c3f74cc7868c2174d2360b87b4167562a1bcc93b"
+}
