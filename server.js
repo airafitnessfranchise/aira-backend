@@ -34,12 +34,29 @@ const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
 const vpRoutes = require("./vp-routes");
 const { createAdminAuth } = require("./admin-auth");
+const { createTrainingSecurity, TRAINING_PATHS } = require("./training-security");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
+const trainingSecurity = createTrainingSecurity({
+  secret: () => process.env.RECORDER_TOKEN_SECRET,
+  getSession: getPracticeSession,
+  canonicalLocationId: normalizeLocationId,
+  getPlayerById: db.getPlayerById,
+  reserveUsage: async (training_token, action) => {
+    if (!process.env.RECORDER_SYNC_SECRET) throw new Error('Training verification unavailable');
+    const response = await fetch(`${process.env.AIRA_API_BASE_URL || 'https://api.airafitness.com'}/internal/recorder/training-usage`, {
+      method:'POST', headers:{'Content-Type':'application/json','x-aira-internal-secret':process.env.RECORDER_SYNC_SECRET},
+      body:JSON.stringify({training_token,action}),signal:AbortSignal.timeout(8000),
+    });
+    const result = await response.json();
+    return {...result,allowed:response.ok && result.allowed===true,status:response.status};
+  },
+});
+app.use(TRAINING_PATHS, trainingSecurity.auth);
 app.use(vpRoutes);
 app.use(express.static("public"));
 
@@ -2389,10 +2406,10 @@ a{color:#0284C7;}
 });
 
 // ─────────── PRACTICE BOT — v0 ───────────
-// Role-play a gym prospect, get scored at the end. No auth, no persistence in v0.
+// Role-play with a scoped Aira training identity and durable pre-provider usage limits.
 // Location dropdown (from locations.js) is informational so future analytics can be tagged.
 
-app.post("/practice/start", async (req, res) => {
+app.post("/practice/start", trainingSecurity.action("start"), async (req, res) => {
   try {
     const difficulty = String(req.body.difficulty || "medium").toLowerCase();
     if (!PROSPECT_PERSONAS[difficulty])
@@ -2423,14 +2440,15 @@ app.post("/practice/start", async (req, res) => {
       forced_scenario_id,
       coach_mode,
     });
+    Object.assign(getPracticeSession(out.session_id), { owner_id:req.training.sub, training_feature:req.trainingFeature });
     res.json({ ok: true, ...out });
   } catch (err) {
     console.error("[Practice] start error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: "Training could not complete. Please try again or reopen it from Aira." });
   }
 });
 
-app.post("/practice/turn", async (req, res) => {
+app.post("/practice/turn", trainingSecurity.action("turn"), async (req, res) => {
   try {
     const { session_id, message } = req.body;
     if (!session_id || !message)
@@ -2442,7 +2460,7 @@ app.post("/practice/turn", async (req, res) => {
     res.json({ ok: true, reply: result.reply, coach: result.coach || null });
   } catch (err) {
     console.error("[Practice] turn error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: "Training could not complete. Please try again or reopen it from Aira." });
   }
 });
 
@@ -2450,7 +2468,7 @@ app.post("/practice/turn", async (req, res) => {
 // Mints an OpenAI Realtime ephemeral session keyed to a new practice session. The
 // browser then uses that ephemeral key to establish a WebRTC peer connection directly
 // to OpenAI for low-latency speech-to-speech with the prospect persona.
-app.post("/practice/voice/session", async (req, res) => {
+app.post("/practice/voice/session", trainingSecurity.action("voice"), async (req, res) => {
   try {
     if (!process.env.OPENAI_API_KEY) {
       return res
@@ -2480,6 +2498,8 @@ app.post("/practice/voice/session", async (req, res) => {
       coach_mode: false, // voice coach hints come in Milestone 2
     });
 
+    Object.assign(getPracticeSession(start.session_id), { owner_id:req.training.sub, training_feature:"practice" });
+
     // Look up the full scenario object so we can build the voice instructions.
     const scenario = findScenarioById(start.scenario_id);
     if (!scenario)
@@ -2497,14 +2517,17 @@ app.post("/practice/voice/session", async (req, res) => {
     const oaResp = await fetch(
       "https://api.openai.com/v1/realtime/client_secrets",
       {
+        signal: AbortSignal.timeout(45000),
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          expires_after: { anchor:"created_at", seconds:60 },
           session: {
             type: "realtime",
+            max_output_tokens: 1024,
             model,
             instructions,
             output_modalities: ["audio"],
@@ -2525,15 +2548,15 @@ app.post("/practice/voice/session", async (req, res) => {
       },
     );
     if (!oaResp.ok) {
-      const txt = await oaResp.text();
+      await oaResp.text();
       console.error(
         "[VoicePractice] OpenAI session error:",
         oaResp.status,
-        txt,
+
       );
       return res
         .status(502)
-        .json({ ok: false, error: "OpenAI session error: " + txt });
+        .json({ ok: false, error: "Voice practice is temporarily unavailable." });
     }
     const data = await oaResp.json();
     const ephemeral_key = data?.value;
@@ -2555,11 +2578,11 @@ app.post("/practice/voice/session", async (req, res) => {
     });
   } catch (err) {
     console.error("[VoicePractice] session error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: "Training could not complete. Please try again or reopen it from Aira." });
   }
 });
 
-app.post("/practice/end", async (req, res) => {
+app.post("/practice/end", trainingSecurity.action("end"), async (req, res) => {
   try {
     const { session_id } = req.body;
     if (!session_id)
@@ -2631,7 +2654,7 @@ app.post("/practice/end", async (req, res) => {
     });
   } catch (err) {
     console.error("[Practice] end error:", err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: "Training could not complete. Please try again or reopen it from Aira." });
   }
 });
 
@@ -2644,19 +2667,17 @@ app.post(
   express.json(),
   async (req, res) => {
     try {
-      const email = String(req.body.email || "").trim();
+      const email = req.training.email;
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res
           .status(400)
           .json({ ok: false, error: "Valid email required" });
       }
-      const name = String(req.body.name || "").trim();
+      const name = req.training.name;
       const location_id = req.body.location_id
         ? canonicalLocationId(req.body.location_id)
         : null;
-      const claim_player_id = req.body.claim_player_id
-        ? String(req.body.claim_player_id)
-        : null;
+      const claim_player_id = null;
       const player = await db.findOrCreatePlayer({
         email,
         name,
@@ -2814,7 +2835,8 @@ const ACHIEVEMENTS = [
 
 app.get("/airafitnessclosinggame/progress", async (req, res) => {
   try {
-    const player_id = req.query.player_id;
+    const player = await db.getPlayerByEmail(req.training.email);
+    const player_id = player?.player_id;
     if (!player_id)
       return res.status(400).json({ ok: false, error: "player_id required" });
 

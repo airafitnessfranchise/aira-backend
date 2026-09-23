@@ -389,16 +389,16 @@ function audioUploadInfo(audioFilePath) {
   return { filename: "recording.webm", contentType: "audio/webm" };
 }
 
-async function scoreTranscript(transcript) {
+async function scoreTranscript(transcript, { practice = false } = {}) {
   console.log("[AI] Scoring transcript with Claude...");
   let lastError;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= (practice ? 1 : 3); attempt++) {
     try {
       const message = await anthropic.messages.create({
         model: "claude-opus-4-5",
         max_tokens: 4096,
         messages: [{ role: "user", content: SCORING_PROMPT + transcript }],
-      });
+      }, practice ? {timeout:45000,maxRetries:0} : undefined);
       const rawText = message.content[0].text.trim();
       console.log(
         `[AI] Claude raw (attempt ${attempt}): ${rawText.substring(0, 200)}...`,
@@ -461,7 +461,7 @@ async function scoreTranscript(transcript) {
     } catch (err) {
       lastError = err;
       console.error(`[AI] Attempt ${attempt} failed: ${err.message}`);
-      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+      if (!practice && attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
     }
   }
   throw new Error(
@@ -1052,7 +1052,7 @@ async function evaluateRepMove(messages) {
       max_tokens: 350,
       system: COACH_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
-    });
+    }, {timeout:45000,maxRetries:0});
     raw = message.content[0].text.trim();
     const cleaned = raw.replace(/```json|```/g, "").trim();
     // Find the first { and last } — handle any prose wrapping
@@ -1102,7 +1102,7 @@ async function chatAsProspect(session_id, rep_message) {
       role: m.role,
       content: m.content,
     })),
-  });
+  }, {timeout:45000,maxRetries:0});
 
   const [prospectResp, coach] = await Promise.all([
     prospectPromise,
@@ -1128,7 +1128,7 @@ async function scorePracticeSession(session_id) {
     `[Practice] scoring session ${session_id} (${session.messages.length} messages, ${transcript.length} chars)`,
   );
   try {
-    const sc = await scoreTranscript(transcript);
+    const sc = await scoreTranscript(transcript, {practice:true});
     console.log(
       `[Practice] score complete: ${sc.total_score}/100 closed=${sc.did_close}`,
     );
