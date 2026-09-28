@@ -3912,8 +3912,16 @@ function bubble(role, text){
   return div;
 }
 async function postJson(url, body){
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  return r.json();
+  try {
+    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const text = await r.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) {}
+    if (!r.ok) return { ok:false, error:(data && data.error) || text || ('Request failed (' + r.status + ')') };
+    return data || { ok:false, error:'The training server returned an empty response.' };
+  } catch (_) {
+    return { ok:false, error:'Could not reach training. Refresh this dashboard page and try again.' };
+  }
 }
 const repInput = $('rep-input');
 repInput.addEventListener('input', () => { repInput.style.height='auto'; repInput.style.height=Math.min(repInput.scrollHeight,140)+'px'; });
@@ -4783,8 +4791,16 @@ function bubble(role, text) {
 }
 
 async function postJson(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  return r.json();
+  try {
+    const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const text = await r.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) {}
+    if (!r.ok) return { ok:false, error:(data && data.error) || text || ('Request failed (' + r.status + ')') };
+    return data || { ok:false, error:'The training server returned an empty response.' };
+  } catch (_) {
+    return { ok:false, error:'Could not reach training. Refresh this dashboard page and try again.' };
+  }
 }
 
 // Voice mode disables coach mode (Milestone 1 — coach hints coming in M2).

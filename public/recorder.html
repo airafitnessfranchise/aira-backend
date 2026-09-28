@@ -95,6 +95,25 @@
   const params = new URLSearchParams(window.location.search);
   const LOCATION_ID = params.get('location') || 'unknown-location';
   const SERVER_URL = params.get('server') || `wss://${window.location.host}`;
+  let STAFF_TOKEN = params.get('staff_token') || '';
+  const ADMIN_ORIGINS = new Set([
+    'https://aira-admin-three.vercel.app',
+    'https://admin.airafitness.com',
+    'http://localhost:3000',
+  ]);
+
+  if (STAFF_TOKEN) {
+    params.delete('staff_token');
+    const cleanQuery = params.toString();
+    history.replaceState(null, '', window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash);
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.parent || !ADMIN_ORIGINS.has(event.origin)) return;
+    if (event.data?.type !== 'aira-recorder-token' || typeof event.data.token !== 'string') return;
+    STAFF_TOKEN = event.data.token;
+    log('Secure recorder access renewed', 'important');
+  });
 
   document.getElementById('location-val').textContent = LOCATION_ID;
 
@@ -227,12 +246,18 @@
     form.append('audio_file', blob, `recording-${apptId}.${ext}`);
 
     try {
+      if (!STAFF_TOKEN) {
+        throw new Error('Open Record a Consult from the signed-in Aira dashboard before uploading.');
+      }
       const res = await fetch(`${window.location.origin}/upload/recording`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${STAFF_TOKEN}` },
         body: form
       });
-      const data = await res.json();
-      if (data.success) {
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+      if (res.ok && data?.success) {
         log(`Upload complete — ${data.recording_id}`, 'important');
         setStatus('ready', 'Ready');
         document.getElementById('file-size').textContent = formatBytes(blob.size);
@@ -241,7 +266,8 @@
         updateTimerDisplay();
         document.getElementById('ring').style.strokeDashoffset = 628;
       } else {
-        log('Upload failed: ' + JSON.stringify(data), 'error');
+        const message = data?.message || data?.error || text || `Upload failed (${res.status})`;
+        log('Upload failed: ' + message, 'error');
         setStatus('ready', 'Upload Failed');
       }
     } catch(e) {
