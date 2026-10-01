@@ -4,6 +4,7 @@ const FormData = require("form-data");
 const fs = require("fs");
 const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
+const { TRAINING_SCORE_TIMEOUT_MS } = require("./training-limits");
 const db = require("./db");
 const { sendScorecardEmail } = require("./email");
 
@@ -392,13 +393,14 @@ function audioUploadInfo(audioFilePath) {
 async function scoreTranscript(transcript, { practice = false } = {}) {
   console.log("[AI] Scoring transcript with Claude...");
   let lastError;
-  for (let attempt = 1; attempt <= (practice ? 1 : 3); attempt++) {
+  const maxAttempts = practice ? 1 : 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const message = await anthropic.messages.create({
         model: "claude-opus-4-5",
         max_tokens: 4096,
         messages: [{ role: "user", content: SCORING_PROMPT + transcript }],
-      }, practice ? {timeout:45000,maxRetries:0} : undefined);
+      }, practice ? {timeout:TRAINING_SCORE_TIMEOUT_MS,maxRetries:0} : undefined);
       const rawText = message.content[0].text.trim();
       console.log(
         `[AI] Claude raw (attempt ${attempt}): ${rawText.substring(0, 200)}...`,
@@ -465,7 +467,7 @@ async function scoreTranscript(transcript, { practice = false } = {}) {
     }
   }
   throw new Error(
-    `Claude scoring failed after 3 attempts: ${lastError.message}`,
+    `Claude scoring failed after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"}: ${lastError.message}`,
   );
 }
 

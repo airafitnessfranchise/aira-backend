@@ -3945,7 +3945,7 @@ $('end-btn').onclick = async () => {
   $('end-btn').textContent = 'Scoring…';
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
-  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This can take up to 2 minutes — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID });
     if (!r.ok){
@@ -5059,7 +5059,7 @@ $('voice-end-btn').onclick = async () => {
   // a "Scoring…" placeholder, then let renderScorecard fill it in once /end returns.
   $('voice').classList.add('hidden');
   $('score').classList.remove('hidden');
-  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This can take up to 2 minutes — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID, messages: VOICE_TRANSCRIPT });
     if (!r.ok) {
@@ -5151,7 +5151,7 @@ $('end-btn').onclick = async () => {
   $('end-btn').textContent = 'Scoring…';
   $('chat').classList.add('hidden');
   $('score').classList.remove('hidden');
-  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This takes 20-40 seconds — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
+  $('score').innerHTML = '<div class="celebration"><h2>Scoring…</h2><p class="sub">Analyzing your full conversation. This can take up to 2 minutes — don\\'t close the tab.</p><div class="spinner-row"><div class="spinner"></div><div style="color:#9CA3AF;font-size:13px;">Reading every move you made…</div></div></div>';
   try {
     const r = await postJson('/practice/end', { session_id: SESSION_ID });
     if (!r.ok) {
