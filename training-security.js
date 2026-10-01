@@ -1,4 +1,5 @@
 const {verifyTrainingToken}=require('./training-token');
+const { TRAINING_SCORE_TIMEOUT_MS } = require('./training-limits');
 const TRAINING_PATHS=['/practice','/airafitnessclosinggame'];
 function bootstrap(token) {
   // Token is server-verified; escaping also prevents closing the script element.
@@ -49,8 +50,9 @@ function createTrainingSecurity({secret, getSession, reserveUsage, canonicalLoca
     actors.add(t.sub);active++;
     let released=false;let timer;
     const release=()=>{if(!released){released=true;active--;actors.delete(t.sub);clearTimeout(timer);}};
-    // Provider calls time out in 45 seconds; hold the slot across client disconnects.
-    timer=setTimeout(release,60000);timer.unref?.();res.once('finish',release);
+    // Scoring can take two minutes; hold its slot across client disconnects
+    // until the provider deadline plus a small response/cleanup margin.
+    timer=setTimeout(release,kind==='end' ? TRAINING_SCORE_TIMEOUT_MS+15000 : 60000);timer.unref?.();res.once('finish',release);
     try {
       const result=await reserveUsage(req.trainingToken,kind);
       if(!result.allowed){release();if(result.retry_after_seconds)res.set('Retry-After',String(result.retry_after_seconds));return res.status(result.status || 503).json({ok:false,error:result.error || 'Training is temporarily unavailable.'});}
