@@ -3,7 +3,8 @@ require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
-const multer = require("multer");
+const { createRecordingUpload } = require("./recording-upload");
+const { createReadinessHandler } = require("./deployment-readiness");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -37,6 +38,7 @@ const { createAdminAuth } = require("./admin-auth");
 const { createTrainingSecurity, TRAINING_PATHS } = require("./training-security");
 
 const app = express();
+app.get("/health/ready", createReadinessHandler());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -63,33 +65,10 @@ app.use(express.static("public"));
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
 
-const storage = multer.diskStorage({
-  destination: UPLOAD_DIR,
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + uuidv4() + audioExtensionForUpload(file));
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } });
+const recordingUpload = createRecordingUpload({ directory: UPLOAD_DIR });
 
 const tabletConnections = new Map();
 const recorderLocationAliases = new Map();
-
-function audioExtensionForUpload(file) {
-  const fromName = path.extname(file?.originalname || "").toLowerCase();
-  if (
-    [".m4a", ".mp4", ".webm", ".mp3", ".wav", ".mpeg", ".mpga"].includes(
-      fromName,
-    )
-  ) {
-    return fromName;
-  }
-  const mime = String(file?.mimetype || "").toLowerCase();
-  if (mime.includes("mp4") || mime.includes("m4a") || mime.includes("aac"))
-    return ".m4a";
-  if (mime.includes("mpeg") || mime.includes("mp3")) return ".mp3";
-  if (mime.includes("wav")) return ".wav";
-  return ".webm";
-}
 
 wss.on("connection", (ws, req) => {
   console.log("[WS] New connection from " + req.socket.remoteAddress);
@@ -388,7 +367,7 @@ app.post("/webhook/ghl", async (req, res) => {
   });
 });
 
-app.post("/upload/recording", requireAiraStaffBearer, upload.single("audio_file"), async (req, res) => {
+app.post("/upload/recording", requireAiraStaffBearer, recordingUpload, async (req, res) => {
   console.log("[Upload] Audio file received");
   const appointment_id = req.body.appointment_id;
   const location_id = (req.body.location_id || "").toLowerCase();

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "repository": "airafitnessfranchise/aira-backend",
+  "date": "2026-10-23",
+  "mode": "companion",
+  "change": "Patch recorder runtime/upload dependencies and add a fail-closed runtime deployment readiness endpoint.",
+  "operational_implications": "Existing member, billing, access, AI and credential behavior preserved. Each release requires exact-revision tests and a retained prior deployment; no production data test writes.",
+  "validation": "Clean npm-ci;43 Node22.23.4 tests and audit0; startup/provider mocks and synthetic upload/auth/abort cleanup checks. Exact GitHub CI and live checks remain release gates.",
+  "limitations": "No live rollback rehearsal or real paid AI/member/provider/payment/physical-door test. Admin CRA build/test/dev-server advisories remain documented for a supported-toolchain migration.",
+  "manual_sections": [
+    "Deployment And Documentation Procedures"
+  ],
+  "manual_commit": "https://github.com/Airafitness/aira-api/commit/02e2a1f1e18290aadf6ac87f19d9e4b8e45b1dc4",
+  "companion_verification": "Authenticated git fetch, merge-base ancestor check and gh commits API verified02e2a1f1 on API origin/main and reviewed its master/runbook coverage of this recorder/Admin release.",
+  "scope": [
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    "deployment-readiness.js",
+    "package-lock.json",
+    "package.json",
+    "railway.json",
+    "recording-upload.js",
+    "server.js"
+  ],
+  "scope_sha256": "9ab3929f7f93cede736b6c61970b9e97514f73fcc58e3e8e0528186b6637c945"
+}
