@@ -1,0 +1,4 @@
+{
+  "$schema": "https://backboard.railway.com/railway.schema.json",
+  "deploy": { "healthcheckPath": "/health/ready", "healthcheckTimeout": 180 }
+}
