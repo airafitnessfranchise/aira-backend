@@ -1,6 +1,7 @@
 // db.js — Postgres (Supabase) persistent storage
 const { Pool } = require("pg");
 const { v4: uuidv4 } = require("uuid");
+const { initializeRecorderDatabase } = require('./database-schema-verification');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -9,6 +10,10 @@ const pool = new Pool({
 
 // ─── Init tables on startup ─────────────────────────────
 async function initDb() {
+  return initializeRecorderDatabase({ pool, bootstrap: bootstrapTables });
+}
+
+async function bootstrapTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS recordings (
       recording_id    TEXT PRIMARY KEY,
