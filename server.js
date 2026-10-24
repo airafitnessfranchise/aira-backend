@@ -35,6 +35,7 @@ const { sendScorecardEmail, sendPracticeEmail } = require("./email");
 const { uploadToR2, getPresignedUrl } = require("./storage");
 const vpRoutes = require("./vp-routes");
 const { createAdminAuth } = require("./admin-auth");
+const { verifyWithRecorderSigningKeys, equalOpaqueSecret } = require("./recorder-credential-transition");
 const { createTrainingSecurity, TRAINING_PATHS } = require("./training-security");
 
 const app = express();
@@ -45,6 +46,8 @@ const wss = new WebSocket.Server({ server });
 app.use(express.json());
 const trainingSecurity = createTrainingSecurity({
   secret: () => process.env.RECORDER_TOKEN_SECRET,
+  previousSecret: () => process.env.RECORDER_PREVIOUS_TOKEN_SECRET,
+  rotationEnabled: () => process.env.RECORDER_CREDENTIAL_ROTATION_ENABLED,
   getSession: getPracticeSession,
   canonicalLocationId: normalizeLocationId,
   getPlayerById: db.getPlayerById,
@@ -157,8 +160,7 @@ function timingSafeEqual(a, b) {
   return crypto.timingSafeEqual(left, right);
 }
 
-function verifyStaffToken(token) {
-  const secret = process.env.RECORDER_TOKEN_SECRET;
+function verifyStaffToken(token, secret = process.env.RECORDER_TOKEN_SECRET) {
   if (!secret) throw new Error("missing_recorder_token_secret");
   const parts = String(token || "").split(".");
   if (parts.length !== 3) throw new Error("malformed_recorder_token");
@@ -211,8 +213,7 @@ function signRecordingResultToken(recording) {
   return `${signingInput}.${signature}`;
 }
 
-function verifyRecordingResultToken(token, recordingId) {
-  const secret = process.env.RECORDER_TOKEN_SECRET;
+function verifyRecordingResultToken(token, recordingId, secret = process.env.RECORDER_TOKEN_SECRET) {
   if (!secret) throw new Error("missing_recorder_token_secret");
   const parts = String(token || "").split(".");
   if (parts.length !== 3) throw new Error("malformed_recording_result_token");
@@ -280,7 +281,7 @@ async function requireAiraStaffBearer(req, res, next) {
 
   if (process.env.RECORDER_TOKEN_SECRET) {
     try {
-      const payload = verifyStaffToken(token);
+      const payload = verifyWithRecorderSigningKeys(token, verifyStaffToken);
       req.staffToken = token;
       req.staff = {
         email: payload.email,
@@ -423,9 +424,9 @@ app.post("/upload/recording", requireAiraStaffBearer, recordingUpload, async (re
 
 app.get("/recording-result/:id", requireAiraStaffBearer, async (req, res) => {
   try {
-    verifyRecordingResultToken(
+    verifyWithRecorderSigningKeys(
       req.query.result_token || req.headers["x-aira-recording-result-token"],
-      req.params.id,
+      (token, secret) => verifyRecordingResultToken(token, req.params.id, secret),
     );
     const recording = await db.getRecording(req.params.id);
     if (!recording) {
@@ -632,7 +633,7 @@ app.post("/admin/rescore/:id", async (req, res) => {
     return res
       .status(503)
       .json({ ok: false, error: "ADMIN_KEY not configured" });
-  if (req.headers["x-admin-key"] !== adminKey)
+  if (!equalOpaqueSecret(req.headers["x-admin-key"], adminKey))
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   const id = req.params.id;
   const recording = await db.getRecording(id);
@@ -665,7 +666,10 @@ app.post("/admin/rescore/:id", async (req, res) => {
 
 // Use the existing Aira Admin staff-token flow. Optional Basic recovery access
 // requires an explicitly configured strong credential; there is no fallback.
-const adminAuth = createAdminAuth({ verifyStaffToken, normalizeLocationId });
+const adminAuth = createAdminAuth({
+  verifyStaffToken: token => verifyWithRecorderSigningKeys(token, verifyStaffToken),
+  normalizeLocationId,
+});
 
 // ─────────── Date range helper for /admin and /admin/location/:id ───────────
 // Accepts ?range=this_month|last_month|30d|90d|all|custom (+ ?from=&to= for custom).

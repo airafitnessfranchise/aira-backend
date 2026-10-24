@@ -13,6 +13,13 @@ Password comparison is constant-time. Protected responses use `Cache-Control:
 no-store` and `Referrer-Policy: no-referrer`. Invalid token errors are not logged by
 the administrator middleware.
 
+The separate [credential handoff preparation](credential-rotation-preparation.md)
+adds one default-off secondary signing reader for an owner-approved rolling
+transition. A current primary is always required and issuance remains primary-only.
+It creates no Basic fallback, replaces no live key and does not change role or
+gym scope. Retiring a signing key also invalidates seven-day result links; the
+normal sign-in refresh does not automatically reissue those links.
+
 ## Rollout impact
 
 - Staff who use Aira Admin Scorecards keep the existing signed-in path.
