@@ -3,24 +3,19 @@
   "repository": "airafitnessfranchise/aira-backend",
   "date": "2026-10-23",
   "mode": "companion",
-  "change": "Patch recorder runtime/upload dependencies and add a fail-closed runtime deployment readiness endpoint.",
-  "operational_implications": "Existing member, billing, access, AI and credential behavior preserved. Each release requires exact-revision tests and a retained prior deployment; no production data test writes.",
-  "validation": "Clean npm-ci;43 Node22.23.4 tests and audit0; startup/provider mocks and synthetic upload/auth/abort cleanup checks. Exact GitHub CI and live checks remain release gates.",
-  "limitations": "No live rollback rehearsal or real paid AI/member/provider/payment/physical-door test. Admin CRA build/test/dev-server advisories remain documented for a supported-toolchain migration.",
+  "change": "Prepare default-off staged signing-key readers for recorder staff, training and result tokens; use constant-time manual-admin key comparison.",
+  "operational_implications": "No live credential or flag change. Current signing primary stays required and result issuance remains primary-only. Activation must follow the coordinated API/recorder priming, switch, drain and retirement sequence. Owner approval must include old-token/result-link invalidation and recorder restart impact.",
+  "validation": "50 full Node22.23.4 Linux arm64 tests passed with networking disabled and read-only source/dependency mounts; seven new tests exercise real result/admin/training paths with synthetic credentials and mocked data. Focused development checks and JavaScript syntax passed. Pinned exact-commit GitHub CI remains required.",
+  "limitations": "No live credential, database/password/grant, data, paid AI, upload, rescore, email or physical-tablet action. No automatic seven-day result-link reissue path. A processing-count snapshot cannot establish that tablets are not recording.",
   "manual_sections": [
-    "Deployment And Documentation Procedures"
+    "Identity And Auth Model"
   ],
-  "manual_commit": "https://github.com/Airafitness/aira-api/commit/02e2a1f1e18290aadf6ac87f19d9e4b8e45b1dc4",
-  "companion_verification": "Authenticated git fetch, merge-base ancestor check and gh commits API verified02e2a1f1 on API origin/main and reviewed its master/runbook coverage of this recorder/Admin release.",
+  "manual_commit": "https://github.com/Airafitness/aira-api/commit/85f164f59938b293c364e0d5963fb8aacd04fd79",
+  "companion_verification": "Authenticated API git fetch, ancestor check, exact-tree comparison and gh commits API verified85f164f59938b293c364e0d5963fb8aacd04fd79 on API origin/main; reviewed current master and recorder preparation procedure.",
   "scope": [
-    ".github/workflows/ci.yml",
-    ".gitignore",
-    "deployment-readiness.js",
-    "package-lock.json",
-    "package.json",
-    "railway.json",
-    "recording-upload.js",
-    "server.js"
+    "recorder-credential-transition.js",
+    "server.js",
+    "training-security.js"
   ],
-  "scope_sha256": "9ab3929f7f93cede736b6c61970b9e97514f73fcc58e3e8e0528186b6637c945"
+  "scope_sha256": "1206bc2c5c229fb8d471127da7bb140458562d3d210216f3ac39c6795e11f446"
 }

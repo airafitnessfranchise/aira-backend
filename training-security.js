@@ -1,4 +1,5 @@
 const {verifyTrainingToken}=require('./training-token');
+const {verifyWithRecorderSigningKeys}=require('./recorder-credential-transition');
 const { TRAINING_SCORE_TIMEOUT_MS } = require('./training-limits');
 const TRAINING_PATHS=['/practice','/airafitnessclosinggame'];
 function bootstrap(token) {
@@ -6,12 +7,15 @@ function bootstrap(token) {
   const encoded=JSON.stringify(token).replace(/</g,'\\u003c');
   return `<script>(function(){const token=${encoded};const current=new URL(location.href);current.searchParams.delete('training_token');history.replaceState(null,'',current.pathname+current.search+current.hash);const original=window.fetch.bind(window);window.fetch=function(input,options){const url=new URL(typeof input==='string'?input:input.url,location.href);if(url.origin===location.origin&&(/^\\/(practice|airafitnessclosinggame)(\\/|$)/).test(url.pathname)){options=Object.assign({},options);const headers=new Headers(options.headers||(typeof input!=='string'?input.headers:undefined));headers.set('Authorization','Bearer '+token);options.headers=headers;}return original(input,options);};document.addEventListener('click',function(event){const a=event.target.closest&&event.target.closest('a[href]');if(!a)return;const url=new URL(a.href,location.href);if(url.origin===location.origin&&(/^\\/(practice|airafitnessclosinggame)(\\/|$)/).test(url.pathname)){url.searchParams.set('training_token',token);a.href=url.href;}},true);})();</script>`;
 }
-function createTrainingSecurity({secret, getSession, reserveUsage, canonicalLocationId, getPlayerById}) {
+function createTrainingSecurity({secret, previousSecret=()=>undefined, rotationEnabled=()=>undefined, getSession, reserveUsage, canonicalLocationId, getPlayerById}) {
   let active=0; const actors=new Set();
   function auth(req,res,next) {
     res.set('Cache-Control','no-store');res.set('Referrer-Policy','no-referrer');res.set('X-Content-Type-Options','nosniff');
     const token=/^Bearer\s+(.+)$/i.exec(req.headers.authorization || '')?.[1] || (req.method==='GET' ? req.query.training_token : null);
-    try { req.training=verifyTrainingToken(token,secret());req.trainingToken=token; }
+    try { req.training=verifyWithRecorderSigningKeys(token,verifyTrainingToken,{
+      RECORDER_TOKEN_SECRET:secret(),RECORDER_PREVIOUS_TOKEN_SECRET:previousSecret(),
+      RECORDER_CREDENTIAL_ROTATION_ENABLED:rotationEnabled(),
+    });req.trainingToken=token; }
     catch { return res.status(401).send('Sign in to Aira, then open Training from the dashboard or Staff app.'); }
     if(req.method==='POST' && req.body?.location_id && !req.training.all_locations && !req.training.location_ids.map(canonicalLocationId).includes(canonicalLocationId(req.body.location_id))) return res.status(403).json({ok:false,error:'Choose one of your assigned gyms.'});
     const fullPath=req.originalUrl.split('?')[0].toLowerCase();

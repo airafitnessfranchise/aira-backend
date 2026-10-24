@@ -95,7 +95,7 @@ test('signed scoped access stays available even with an unusable recovery config
   assert.equal(r.allowed, 1); assert.equal(r.req.staff.is_super, false);
 });
 test('server routes retain the protected middleware and no default password expression', () => {
-  assert.match(source, /const adminAuth = createAdminAuth\(\{ verifyStaffToken, normalizeLocationId \}\)/);
+  assert.match(source, /verifyStaffToken: token => verifyWithRecorderSigningKeys\(token, verifyStaffToken\)/);
   assert.doesNotMatch(source, /ADMIN_PASSWORD\s*\|\|/);
   for (const route of ['/admin', '/admin/locations', '/admin/location/:id', '/admin/library', '/scorecard/:id', '/playback/:recording_id']) {
     assert.ok(source.includes(`app.get("${route}", adminAuth,`), route);
