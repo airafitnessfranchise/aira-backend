@@ -1,0 +1,602 @@
+{
+  "schema_version": 1,
+  "tables": [
+    {
+      "name": "custom_locations",
+      "columns": [
+        {
+          "name": "location_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "franchise_name",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "franchisee_name",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "franchisee_email",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "vp_email",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "club_email",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "ghl_calendar_id",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        }
+      ],
+      "constraints": [
+        {
+          "type": "p",
+          "definition": "PRIMARY KEY (location_id)"
+        }
+      ]
+    },
+    {
+      "name": "players",
+      "columns": [
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "location_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        },
+        {
+          "name": "last_seen",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        }
+      ],
+      "constraints": [
+        {
+          "type": "u",
+          "definition": "UNIQUE (email)"
+        },
+        {
+          "type": "p",
+          "definition": "PRIMARY KEY (player_id)"
+        }
+      ]
+    },
+    {
+      "name": "practice_sessions",
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "location_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "difficulty",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "persona_label",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "messages",
+          "type": "jsonb",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "total_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "objection_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "language_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "close_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "did_close",
+          "type": "boolean",
+          "default": "false",
+          "not_null": false
+        },
+        {
+          "name": "ai_summary",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "overall_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "process_warning",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        },
+        {
+          "name": "scenario_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "player_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "player_name",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "default": "'practice'::text",
+          "not_null": false
+        }
+      ],
+      "constraints": [
+        {
+          "type": "p",
+          "definition": "PRIMARY KEY (session_id)"
+        }
+      ]
+    },
+    {
+      "name": "recordings",
+      "columns": [
+        {
+          "name": "recording_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "appointment_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "location_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "contact_name",
+          "type": "text",
+          "default": "'Walk-in'::text",
+          "not_null": false
+        },
+        {
+          "name": "audio_file_url",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "r2_key",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "transcript",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "duration_seconds",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        },
+        {
+          "name": "processing_status",
+          "type": "text",
+          "default": "'pending'::text",
+          "not_null": false
+        }
+      ],
+      "constraints": [
+        {
+          "type": "p",
+          "definition": "PRIMARY KEY (recording_id)"
+        }
+      ]
+    },
+    {
+      "name": "scorecards",
+      "columns": [
+        {
+          "name": "scorecard_id",
+          "type": "text",
+          "default": null,
+          "not_null": true
+        },
+        {
+          "name": "recording_id",
+          "type": "text",
+          "default": null,
+          "not_null": false
+        },
+        {
+          "name": "total_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "objection_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "language_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "close_score",
+          "type": "integer",
+          "default": "0",
+          "not_null": false
+        },
+        {
+          "name": "ai_summary",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "coaching_note",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "flagged_for_review",
+          "type": "boolean",
+          "default": "false",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "not_null": false
+        },
+        {
+          "name": "did_close",
+          "type": "boolean",
+          "default": "false",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_what_said",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_what_to_say",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "process_warning",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "overall_coaching",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "sitdown_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "objection_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "language_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        },
+        {
+          "name": "close_score_explainer",
+          "type": "text",
+          "default": "''::text",
+          "not_null": false
+        }
+      ],
+      "constraints": [
+        {
+          "type": "p",
+          "definition": "PRIMARY KEY (scorecard_id)"
+        },
+        {
+          "type": "f",
+          "definition": "FOREIGN KEY (recording_id) REFERENCES recordings(recording_id)"
+        }
+      ]
+    }
+  ]
+}
