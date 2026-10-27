@@ -435,6 +435,26 @@ async function savePracticeSession({
   );
 }
 
+async function getTrainingProgressByEmails(emails) {
+  const normalized = [...new Set((emails || []).map(x => String(x).trim().toLowerCase()))];
+  if (!normalized.length) return [];
+  const { rows } = await pool.query(
+    `SELECT lower(p.email) AS email, s.mode,
+            COUNT(*)::int AS scored_sessions,
+            MIN(s.created_at) AS first_scored_at,
+            MAX(s.created_at) AS last_scored_at,
+            MAX(s.total_score)::int AS best_score,
+            (ARRAY_AGG(s.total_score ORDER BY s.created_at DESC, s.session_id DESC))[1]::int AS latest_score
+       FROM players p
+       JOIN practice_sessions s ON s.player_id = p.player_id
+      WHERE lower(p.email) = ANY($1::text[])
+        AND s.mode IN ('practice', 'game')
+      GROUP BY lower(p.email), s.mode`,
+    [normalized],
+  );
+  return rows;
+}
+
 async function getAllPracticeSessions() {
   const { rows } = await pool.query(
     "SELECT * FROM practice_sessions ORDER BY created_at DESC",
@@ -674,6 +694,7 @@ module.exports = {
   getScorecardHistory,
   getAllScorecards,
   savePracticeSession,
+  getTrainingProgressByEmails,
   getAllPracticeSessions,
   getPlayerGameProgress,
   getGameLeaderboard,

@@ -1,23 +1,21 @@
 {
   "schema_version": 1,
   "repository": "airafitnessfranchise/aira-backend",
-  "date": "2026-10-23",
+  "date": "2026-10-27",
   "mode": "companion",
-  "change": "Prepare a dormant catalog-verification startup path and proposed NOLOGIN limited application role for recorder database password replacement.",
-  "operational_implications": "Absent schema-mode settings retain existing bootstrap behavior. Verify mode requires exact schema, role, privileges and policies and never repairs or falls back to DDL. The proposed migration is not automatically applied and commits no password. Actual grants, login enablement, URL switch and administrator-password retirement require the separately verified cutover.",
-  "validation": "All55 tests passed on pinned Node22.23.4 in isolated Linux; five new unit tests include22 negative catalog/role/policy/privilege mutations.44 PostgreSQL17 lab checks exercised actual startup, proposed migration, required CRUD, ten browser denials, denied DDL/TRUNCATE/escalation and extra-privilege rejection. The lab requires a matching fresh server nonce before writes.",
-  "limitations": "No live database/password/grant/policy/data/provider change, paid AI, message, backup run or physical-tablet proof. Current backup comparison and exact live cutover approval remain gates. Default source deployment does not perform the cutover.",
+  "change": "Stage no-gym Practice Bot and Closing Game pages, durable score identity, and a protected training progress report for the API.",
+  "operational_implications": "PREOPENING_TRAINING_ENABLED defaults off. When enabled, a no-gym training token can start both activities without a gym; the recorder joins scored sessions to the verified token email and returns Bot/Game score counts to the API through the existing internal sync secret. A save failure prevents a false completion.",
+  "validation": "All 55 recorder tests passed under pinned Node22.23.4, including rendered Bot/Game pages for no-gym tokens and default-off behavior. No paid AI or live database score was used.",
+  "limitations": "No live flag, provider call, trainee account, scored session, or production database write has been made. Score reporting requires recorder database connectivity and matching API configuration.",
   "manual_sections": [
-    "Identity And Auth Model"
+    "Identity And Auth Model",
+    "Internal Classroom"
   ],
-  "manual_commit": "https://github.com/Airafitness/aira-api/commit/0e99e7d39bff153468453501220faf4d67b51f0b",
-  "companion_verification": "Authenticated API git fetch, gh merge/commit and exact-tree checks verified 0e99e7d39bff153468453501220faf4d67b51f0b on API main; reviewed current master and the recorder database cutover procedure.",
+  "manual_commit": "https://github.com/Airafitness/aira-api/commit/f445e063be8c10c7fd36f166100f4c411987d73d",
+  "companion_verification": "Authenticated gh commit read returned f445e063be8c10c7fd36f166100f4c411987d73d; an authenticated API fetch and merge-base check verified it on origin/main. Reviewed its Identity And Auth Model and Internal Classroom sections for the default-off pre-opening access, no-gym training, and Owner/VP report.",
   "scope": [
-    "database-schema-verification.js",
     "db.js",
-    "security/recorder-database-schema-contract.json",
-    "security/verify-recorder-database-role-local.js",
-    "supabase/migrations/20261024004513_recorder_database_application_role.sql"
+    "server.js"
   ],
-  "scope_sha256": "71d8d9a028bca10173a6eda8bf98b26a099fb31d549028b9ad4beb71f41275ff"
+  "scope_sha256": "18c56c70b2bfe7636ecaccca224f59dd907cae8ffa107286a00138ac0876eaeb"
 }
