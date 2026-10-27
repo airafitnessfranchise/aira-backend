@@ -62,6 +62,24 @@ const trainingSecurity = createTrainingSecurity({
   },
 });
 app.use(TRAINING_PATHS, trainingSecurity.auth);
+app.post('/internal/training-progress', async (req, res) => {
+  if (process.env.PREOPENING_TRAINING_ENABLED !== 'true') return res.status(404).json({ error: 'Unavailable' });
+  const secret = process.env.RECORDER_SYNC_SECRET;
+  if (!secret || !equalOpaqueSecret(req.headers['x-aira-internal-secret'], secret)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const emails = req.body?.emails;
+  if (!Array.isArray(emails) || emails.length > 500 || emails.some(email => typeof email !== 'string' || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return res.status(400).json({ error: 'Invalid trainees' });
+  }
+  try {
+    res.set('Cache-Control', 'no-store');
+    return res.json({ progress: await db.getTrainingProgressByEmails(emails) });
+  } catch (err) {
+    console.error('[training-progress] unavailable', err.message);
+    return res.status(503).json({ error: 'Training progress unavailable' });
+  }
+});
 app.use(vpRoutes);
 app.use(express.static("public"));
 
@@ -2600,13 +2618,23 @@ app.post("/practice/end", trainingSecurity.action("end"), async (req, res) => {
     };
     const personaLabelForRecord = `${session.bucket_label} — ${session.scenario.name}`;
     try {
+      let playerId = session.player_id || null;
+      if (process.env.PREOPENING_TRAINING_ENABLED === 'true') {
+        const player = await db.findOrCreatePlayer({
+          email: req.training.email,
+          name: req.training.name,
+          location_id: session.location_id || null,
+          claim_player_id: null,
+        });
+        playerId = player.player_id;
+      }
       await db.savePracticeSession({
         session_id,
         location_id: session.location_id || null,
         difficulty: session.difficulty,
         persona_label: personaLabelForRecord,
         scenario_id: session.scenario.id,
-        player_id: session.player_id || null,
+        player_id: playerId,
         player_name: session.player_name || null,
         mode: session.mode || "practice",
         messages: result.messages,
@@ -2614,7 +2642,9 @@ app.post("/practice/end", trainingSecurity.action("end"), async (req, res) => {
       });
     } catch (dbErr) {
       console.error("[Practice] DB save failed:", dbErr.message);
-      // don't fail the user-facing response — the scorecard still renders
+      if (process.env.PREOPENING_TRAINING_ENABLED === 'true') {
+        return res.status(503).json({ ok: false, error: 'The score could not be saved. Start a new training session.' });
+      }
     }
 
     res.json({
@@ -2917,7 +2947,8 @@ app.get("/airafitnessclosinggame/scenario/:id", (req, res) => {
 });
 
 app.get("/airafitnessclosinggame", (req, res) => {
-  const locOptions = ALL_LOCATIONS.map(
+  const preopeningMode = process.env.PREOPENING_TRAINING_ENABLED === 'true' && !req.training.all_locations && req.training.location_ids.length === 0;
+  const locOptions = preopeningMode ? '' : ALL_LOCATIONS.map(
     (l) => `<option value="${l.location_id}">${l.franchise_name}</option>`,
   ).join("");
   // Send the full level + scenario metadata so the client can render the level map.
@@ -3456,7 +3487,7 @@ body::after{
       <div class="start-card">
         <label><span>Your Email <span style="color:#EC4899;">*</span></span><input id="player-email" type="email" placeholder="you@airafitness.com" required autocomplete="email" /></label>
         <label><span>Your Name</span><input id="player-name" placeholder="e.g. Alex" maxlength="32" autocomplete="name" /></label>
-        <label><span>Your Gym</span><select id="location"><option value="">— Select your gym —</option>${locOptions}</select></label>
+        <label><span>${preopeningMode ? 'Training location' : 'Your Gym'}</span><select id="location"><option value="">${preopeningMode ? 'Pre-opening training (no gym needed)' : '— Select your gym —'}</option>${locOptions}</select></label>
         <button class="btn-primary" id="enter-btn">Enter the Game →</button>
         <div style="margin-top:14px;font-size:12px;color:rgba(255,255,255,0.5);text-align:center;line-height:1.55;">Your progress is saved to your email — sign in from any device to pick up where you left off.</div>
       </div>
@@ -3565,6 +3596,7 @@ body::after{
 
 <script>
 const LEVELS = ${JSON.stringify(levelData)};
+const PREOPENING_MODE = ${preopeningMode};
 const $ = (id) => document.getElementById(id);
 let PLAYER = { id: null, email: null, name: null, location_id: null, xp: 0, closes: 0, attempts: 0, scenarios_passed: [], highest_level: 1 };
 let SESSION_ID = null;
@@ -3628,7 +3660,7 @@ function loadCachedProfile(){
   const l = (document.cookie.match(/aira_player_location=([^;]+)/)||[])[1];
   if (e) PLAYER.email = decodeURIComponent(e);
   if (n) PLAYER.name = decodeURIComponent(n);
-  if (l) PLAYER.location_id = decodeURIComponent(l);
+  if (l && !PREOPENING_MODE) PLAYER.location_id = decodeURIComponent(l);
 }
 function loadQueryProfile(){
   const email = (QUERY_PARAMS.get('email') || '').trim();
@@ -3637,7 +3669,7 @@ function loadQueryProfile(){
   const location_name = (QUERY_PARAMS.get('location_name') || '').trim();
   if (email) PLAYER.email = email;
   if (name) PLAYER.name = name;
-  if (location_id) {
+  if (location_id && !PREOPENING_MODE) {
     PLAYER.location_id = location_id;
     ensureLocationOption(location_id, location_name);
   }
@@ -3771,7 +3803,7 @@ $('enter-btn').onclick = async () => {
   const name = $('player-name').value.trim();
   const loc = $('location').value;
   if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { alert('Enter a valid email'); return; }
-  if (!loc) { alert('Pick your gym to continue'); return; }
+  if (!loc && !PREOPENING_MODE) { alert('Pick your gym to continue'); return; }
   $('enter-btn').disabled = true;
   $('enter-btn').textContent = 'Loading…';
   try {
@@ -4342,7 +4374,8 @@ h2.section .accent{
 });
 
 app.get("/practice", (req, res) => {
-  const locOptions = ALL_LOCATIONS.map(
+  const preopeningMode = process.env.PREOPENING_TRAINING_ENABLED === 'true' && !req.training.all_locations && req.training.location_ids.length === 0;
+  const locOptions = preopeningMode ? '' : ALL_LOCATIONS.map(
     (l) => `<option value="${l.location_id}">${l.franchise_name}</option>`,
   ).join("");
   const diffOptions = Object.entries(PROSPECT_PERSONAS)
@@ -4616,8 +4649,8 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
           <label class="fld"><span>Difficulty</span>
             <select id="difficulty">${diffOptions}</select>
           </label>
-          <label class="fld"><span>Your Gym</span>
-            <select id="location"><option value="">— Select your gym —</option>${locOptions}</select>
+          <label class="fld"><span>${preopeningMode ? 'Training location' : 'Your Gym'}</span>
+            <select id="location"><option value="">${preopeningMode ? 'Pre-opening training (no gym needed)' : '— Select your gym —'}</option>${locOptions}</select>
           </label>
           <label class="fld"><span>🎯 Skill Focus (optional)</span>
             <select id="skill-drill">${drillOptions}</select>
@@ -4680,6 +4713,7 @@ button.cta.secondary:hover{background:rgba(255,255,255,0.1);}
 
 <script>
 const $ = (id) => document.getElementById(id);
+const PREOPENING_MODE = ${preopeningMode};
 let SESSION_ID = null;
 let SCENARIO_ID = '';
 let COACH_MODE = false;
@@ -4721,6 +4755,7 @@ function applyEmbedMode(){
 }
 
 function ensureLocationOption(location_id, label){
+  if (PREOPENING_MODE) return;
   if (!location_id) return;
   const select = $('location');
   if (!select) return;
@@ -4733,6 +4768,7 @@ function ensureLocationOption(location_id, label){
   }
 }
 function applyQueryLocations(){
+  if (PREOPENING_MODE) return;
   const raw = QUERY_PARAMS.get('locations');
   if (!raw) return;
   let locations = [];
@@ -4805,7 +4841,7 @@ $('start-btn').onclick = async () => {
   // When the user picks a skill drill, randomly select a persona from that
   // drill's pool. The backend will honor scenario_id and skip its difficulty picker.
   const forced_scenario_id = drill_id ? drillRandomScenarioId(drill_id) : null;
-  if (!location_id) { alert('Please select your gym'); return; }
+  if (!location_id && !PREOPENING_MODE) { alert('Please select your gym'); return; }
   $('start-btn').disabled = true;
   $('start-btn').textContent = 'Starting…';
   if (voice_mode) {
