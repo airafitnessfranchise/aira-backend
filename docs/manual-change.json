@@ -5,7 +5,7 @@
   "mode": "companion",
   "change": "Restore archived consult audio from R2 when a local upload is unavailable during manual rescore.",
   "operational_implications": "A failed recording with a matching archived object can be transcribed and scored after a recorder restart. Existing local uploads continue normally; recovery avoids a duplicate R2 write and deletes its temporary local file. The approved eight Fox Lake replays will send normal scorecard emails after the OpenAI key is replaced.",
-  "validation": "Sixty tests passed under pinned Node 22.23.4, including archive selection, stream recovery and partial cleanup. Read-only production database and R2 HEAD checks found eight failed Fox Lake recordings with matching available archive objects and no scorecards. The Anthropic key authenticated read-only.",
+  "validation": "Sixty-one tests passed under pinned Node 22.23.4, including archive selection, stream recovery and partial cleanup. Read-only production database and R2 HEAD checks found eight failed Fox Lake recordings with matching available archive objects and no scorecards. The Anthropic key authenticated read-only.",
   "limitations": "The new OpenAI key is not yet installed, this code is not yet deployed, the eight recordings have not been replayed, and Alma’s physical phone or tablet microphone has not been verified. A direct unsigned tablet bookmark still cannot upload.",
   "manual_sections": [
     "Consult Recorder Processing And Archive Recovery — 2026-11-10"
@@ -17,5 +17,5 @@
     "server.js",
     "storage.js"
   ],
-  "scope_sha256": "6b68a580a6b5c505bf4e3d09eb4fac615ada6395c4c5d94add1cdbd4d92b9b89"
+  "scope_sha256": "a7f8cf42ba61738a7087a53c1616be986c87eda431af54e6c1d37a8332e15287"
 }

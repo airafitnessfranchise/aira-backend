@@ -57,12 +57,17 @@ async function uploadToR2(localFilePath, recordingId) {
 async function downloadFromR2(r2Key, localFilePath, client = getR2Client()) {
   if (!client) throw new Error('R2 storage is unavailable');
   const bucket = process.env.R2_BUCKET_NAME || 'aira-recordings';
+  let fileHandle;
   try {
     const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: r2Key }));
     if (!response.Body) throw new Error('Archived recording has no audio body');
-    await pipeline(response.Body, fs.createWriteStream(localFilePath, { flags: 'wx' }));
+    fileHandle = await fs.promises.open(localFilePath, 'wx');
+    await pipeline(response.Body, fileHandle.createWriteStream());
   } catch (error) {
-    await fs.promises.unlink(localFilePath).catch(() => {});
+    if (fileHandle) {
+      await fileHandle.close().catch(() => {});
+      await fs.promises.unlink(localFilePath).catch(() => {});
+    }
     throw error;
   }
 }
