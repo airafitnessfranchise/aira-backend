@@ -32,7 +32,8 @@ const {
   SKILL_DRILLS,
 } = require("./ai");
 const { sendScorecardEmail, sendPracticeEmail } = require("./email");
-const { uploadToR2, getPresignedUrl } = require("./storage");
+const { uploadToR2, downloadFromR2, getPresignedUrl } = require("./storage");
+const { recordingAudioForTranscription } = require("./recording-audio");
 const vpRoutes = require("./vp-routes");
 const { createAdminAuth } = require("./admin-auth");
 const { verifyWithRecorderSigningKeys, equalOpaqueSecret } = require("./recorder-credential-transition");
@@ -539,6 +540,7 @@ async function processRecording(
   appointment_id,
   testOnly,
 ) {
+  let temporaryAudioFilePath = null;
   const resolvedLocationId = resolveRecorderLocationId(location_id);
   const location = byLocationId[resolvedLocationId] || {
     location_id: location_id || "unknown",
@@ -559,17 +561,27 @@ async function processRecording(
       console.log("[Pipeline] Reusing existing transcript for " + recording_id);
       transcript = existing.transcript;
     } else {
-      console.log("[Pipeline] Uploading to R2: " + recording_id);
-      r2Key = await uploadToR2(audioFilePath, recording_id);
-      if (r2Key) {
-        await db.updateRecording(recording_id, { r2_key: r2Key });
-        console.log("[Pipeline] R2 key stored: " + r2Key);
+      const audio = await recordingAudioForTranscription({
+        audioFilePath,
+        r2Key,
+        recordingId: recording_id,
+        uploadDir: UPLOAD_DIR,
+        downloadFromR2,
+      });
+      if (audio.temporary) temporaryAudioFilePath = audio.filePath;
+      if (!r2Key) {
+        console.log("[Pipeline] Uploading to R2: " + recording_id);
+        r2Key = await uploadToR2(audio.filePath, recording_id);
+        if (r2Key) {
+          await db.updateRecording(recording_id, { r2_key: r2Key });
+          console.log("[Pipeline] R2 key stored: " + r2Key);
+        }
       }
       console.log("[Pipeline] Transcribing " + recording_id);
       await db.updateRecording(recording_id, {
         processing_status: "transcribing",
       });
-      transcript = await transcribeAudio(audioFilePath);
+      transcript = await transcribeAudio(audio.filePath);
       await db.updateRecording(recording_id, {
         transcript: transcript,
         processing_status: "transcribed",
@@ -612,6 +624,12 @@ async function processRecording(
   } catch (err) {
     console.error("[Pipeline] Error:", err.message);
     await db.updateRecording(recording_id, { processing_status: "failed" });
+  } finally {
+    if (temporaryAudioFilePath) {
+      await fs.promises.unlink(temporaryAudioFilePath).catch((err) => {
+        console.warn("[Pipeline] Recovered audio cleanup failed:", err.message);
+      });
+    }
   }
 }
 
