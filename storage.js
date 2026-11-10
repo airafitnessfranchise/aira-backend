@@ -4,6 +4,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('stream/promises');
 
 let r2Client = null;
 
@@ -52,6 +53,25 @@ async function uploadToR2(localFilePath, recordingId) {
   return key;
 }
 
+/** Restore an archived recording to a temporary local path for transcription. */
+async function downloadFromR2(r2Key, localFilePath, client = getR2Client()) {
+  if (!client) throw new Error('R2 storage is unavailable');
+  const bucket = process.env.R2_BUCKET_NAME || 'aira-recordings';
+  let fileHandle;
+  try {
+    const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: r2Key }));
+    if (!response.Body) throw new Error('Archived recording has no audio body');
+    fileHandle = await fs.promises.open(localFilePath, 'wx');
+    await pipeline(response.Body, fileHandle.createWriteStream());
+  } catch (error) {
+    if (fileHandle) {
+      await fileHandle.close().catch(() => {});
+      await fs.promises.unlink(localFilePath).catch(() => {});
+    }
+    throw error;
+  }
+}
+
 /**
  * Generate a presigned URL valid for linkExpirySeconds (default 7 days).
  * Returns null if R2 is not configured.
@@ -71,7 +91,7 @@ async function getPresignedUrl(r2Key, linkExpirySeconds = 60 * 60 * 24 * 7) {
   return url;
 }
 
-module.exports = { uploadToR2, getPresignedUrl };
+module.exports = { uploadToR2, downloadFromR2, getPresignedUrl };
 
 function contentTypeForAudioPath(filePath) {
   const ext = path.extname(filePath || '').toLowerCase();

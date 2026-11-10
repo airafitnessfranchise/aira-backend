@@ -1,21 +1,21 @@
 {
   "schema_version": 1,
   "repository": "airafitnessfranchise/aira-backend",
-  "date": "2026-10-27",
+  "date": "2026-11-10",
   "mode": "companion",
-  "change": "Stage no-gym Practice Bot and Closing Game pages, durable score identity, and a protected training progress report for the API.",
-  "operational_implications": "PREOPENING_TRAINING_ENABLED defaults off. When enabled, a no-gym training token can start both activities without a gym; the recorder joins scored sessions to the verified token email and returns Bot/Game score counts to the API through the existing internal sync secret. A save failure prevents a false completion.",
-  "validation": "All 55 recorder tests passed under pinned Node22.23.4, including rendered Bot/Game pages for no-gym tokens and default-off behavior. No paid AI or live database score was used.",
-  "limitations": "No live flag, provider call, trainee account, scored session, or production database write has been made. Score reporting requires recorder database connectivity and matching API configuration.",
+  "change": "Restore archived consult audio from R2 when a local upload is unavailable during manual rescore.",
+  "operational_implications": "A failed recording with a matching archived object can be transcribed and scored after a recorder restart. Existing local uploads continue normally; recovery avoids a duplicate R2 write and deletes its temporary local file. The approved eight Fox Lake replays will send normal scorecard emails after the OpenAI key is replaced.",
+  "validation": "Sixty-one tests passed under pinned Node 22.23.4, including archive selection, stream recovery and partial cleanup. Read-only production database and R2 HEAD checks found eight failed Fox Lake recordings with matching available archive objects and no scorecards. The Anthropic key authenticated read-only.",
+  "limitations": "The new OpenAI key is not yet installed, this code is not yet deployed, the eight recordings have not been replayed, and Alma’s physical phone or tablet microphone has not been verified. A direct unsigned tablet bookmark still cannot upload.",
   "manual_sections": [
-    "Identity And Auth Model",
-    "Internal Classroom"
+    "Consult Recorder Processing And Archive Recovery — 2026-11-10"
   ],
-  "manual_commit": "https://github.com/Airafitness/aira-api/commit/f445e063be8c10c7fd36f166100f4c411987d73d",
-  "companion_verification": "Authenticated gh commit read returned f445e063be8c10c7fd36f166100f4c411987d73d; an authenticated API fetch and merge-base check verified it on origin/main. Reviewed its Identity And Auth Model and Internal Classroom sections for the default-off pre-opening access, no-gym training, and Owner/VP report.",
+  "manual_commit": "https://github.com/Airafitness/aira-api/commit/4124e30518efc37e7580f196a815043be723e1e7",
+  "companion_verification": "Authenticated gh commit read returned 4124e30518efc37e7580f196a815043be723e1e7 with the current master and manual-change files; authenticated git fetch and merge-base confirmed the commit is on API origin/main. Reviewed its consult recorder failure and archive recovery section.",
   "scope": [
-    "db.js",
-    "server.js"
+    "recording-audio.js",
+    "server.js",
+    "storage.js"
   ],
-  "scope_sha256": "18c56c70b2bfe7636ecaccca224f59dd907cae8ffa107286a00138ac0876eaeb"
+  "scope_sha256": "a7f8cf42ba61738a7087a53c1616be986c87eda431af54e6c1d37a8332e15287"
 }
